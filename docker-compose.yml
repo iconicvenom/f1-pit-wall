@@ -1,0 +1,15 @@
+services:
+  f1-dashboard:
+    build: .
+    image: f1-pitwall:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - f1_cache:/app/f1_cache
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped
+
+volumes:
+  f1_cache:

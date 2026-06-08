@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="api-base" content="">
+<meta name="theme-color" content="#e10600">
+<title>F1 2026 · Race Control</title>
+<link rel="icon" href="assets/favicon-32.png" type="image/png" sizes="32x32">
+<link rel="apple-touch-icon" href="assets/favicon-192.png" sizes="192x192">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preload" href="fonts/Formula1-Regular-1.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="fonts/Formula1-Wide.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="fonts/Formula1-Italic.ttf" as="font" type="font/ttf" crossorigin>
+<style>
+/* F1 Regular — body, labels, data, mono values */
+@font-face{font-family:'F1 Regular';src:url('fonts/Formula1-Regular-1.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+/* F1 Turbo — headlines, section titles, display type */
+@font-face{font-family:'F1 Turbo';src:url('fonts/Formula1-Wide.ttf') format('truetype');font-weight:400;font-style:normal;font-display:swap}
+@font-face{font-family:'F1 Turbo';src:url('fonts/Formula1-Bold_web.ttf') format('truetype');font-weight:700;font-style:normal;font-display:swap}
+@font-face{font-family:'F1 Turbo';src:url('fonts/Formula1-Black.ttf') format('truetype');font-weight:900;font-style:normal;font-display:swap}
+/* F1 Torque — italic emphasis, greetings, hero accents */
+@font-face{font-family:'F1 Torque';src:url('fonts/Formula1-Italic.ttf') format('truetype');font-weight:400;font-style:italic;font-display:swap}
+:root {
+  --f1-black:#151515;--f1-red:#e10600;--f1-white:#fff;--f1-grey:#38383f;--f1-mid:#242424;
+  --f1-surface:#1e1e1e;--f1-border:#2e2e2e;--f1-text:#f5f5f5;--f1-text-2:#888;
+  --gold:#d4a017;--silver:#aaa;--bronze:#8b6343;
+  --mercedes:#27F4D2;--ferrari:#E8002D;--mclaren:#FF8000;--redbull:#3671C6;--red_bull:#3671C6;
+  --williams:#64C4FF;--haas:#B6BABD;--alpine:#0093CC;--audi:#00877C;--racingbulls:#6692FF;
+  --racing_bulls:#6692FF;--rb:#6692FF;--aston:#229971;--aston_martin:#229971;--cadillac:#8A9099;
+  --soft:#ff7575;--medium:#ffd84d;--hard:#f0f0f0;--inter:#4ad07c;--wet:#4a8fd0;
+  --accent:#e10600;--accent-glow:rgba(225,6,0,.18);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:"F1 Regular",sans-serif;background:var(--f1-black);color:var(--f1-text);min-height:100vh;overflow-x:hidden}
+.f1-display{font-family:"F1 Turbo",sans-serif;font-weight:700;text-transform:uppercase;letter-spacing:.02em}
+.f1-torque{font-family:"F1 Torque",sans-serif;font-style:italic}
+.mono{font-family:"F1 Regular",sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.hidden{display:none!important}
+a{color:inherit;text-decoration:none}
+
+@keyframes maskRevealUp{from{clip-path:inset(100% 0 0 0);transform:translateY(20px);opacity:0}to{clip-path:inset(0 0 0 0);transform:translateY(0);opacity:1}}
+@keyframes underlineDraw{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes ticker{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@keyframes pulseDot{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.4);opacity:.6}}
+@keyframes barGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes rowSlide{from{transform:translateX(-24px);opacity:0}to{transform:translateX(0);opacity:1}}
+@keyframes numCount{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes speedLine{from{transform:translateX(-100%)}to{transform:translateX(200vw)}}
+@keyframes flagWave{0%,100%{transform:rotate(-5deg)}50%{transform:rotate(5deg)}}
+@keyframes flashOut{0%{opacity:0}30%{opacity:.85}100%{opacity:0}}
+@keyframes checkerWipe{0%{clip-path:inset(0 100% 0 0)}100%{clip-path:inset(0 0 0 0)}}
+@keyframes particleBurst{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0}}
+@keyframes liveBannerPulse{0%,100%{opacity:1}50%{opacity:.4}}
+@keyframes carRace{from{offset-distance:0%}to{offset-distance:100%}}
+@keyframes orbDrift{0%,100%{transform:translate(0,0)}50%{transform:translate(30px,-20px)}}
+@keyframes splashLoad{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
+@keyframes drvIn{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes dotPop{0%{transform:scale(0)}60%{transform:scale(1.3)}100%{transform:scale(1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* Onboarding */
+#onboarding{position:fixed;inset:0;z-index:200;background:var(--f1-black);display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden}
+#onboarding.exit-flash::after{content:'';position:absolute;inset:0;background:var(--accent);animation:flashOut .6s forwards;z-index:10;pointer-events:none}
+#onboarding.checker-wipe::before{content:'';position:absolute;inset:0;background:repeating-conic-gradient(#fff 0% 25%,#000 0% 50%) 50%/20px 20px;animation:checkerWipe .7s forwards;z-index:11;pointer-events:none}
+.ob-orb{position:absolute;border-radius:50%;filter:blur(80px);opacity:.25;animation:orbDrift 12s ease-in-out infinite}
+.ob-orb1{width:400px;height:400px;background:var(--f1-red);top:-100px;left:-100px}
+.ob-orb2{width:300px;height:300px;background:var(--gold);bottom:-80px;right:-60px;animation-delay:-4s}
+.ob-orb3{width:250px;height:250px;background:var(--accent);top:40%;right:20%;animation-delay:-8s}
+.ob-speed{position:absolute;height:1px;width:120px;background:linear-gradient(90deg,transparent,var(--f1-red),transparent);animation:speedLine 6s linear infinite;opacity:.3}
+.ob-crop{position:absolute;width:20px;height:20px;border-color:var(--f1-text-2);border-style:solid;border-width:0}
+.ob-crop.tl{top:20px;left:20px;border-top-width:1px;border-left-width:1px}
+.ob-crop.tr{top:20px;right:20px;border-top-width:1px;border-right-width:1px}
+.ob-crop.bl{bottom:20px;left:20px;border-bottom-width:1px;border-left-width:1px}
+.ob-crop.br{bottom:20px;right:20px;border-bottom-width:1px;border-right-width:1px}
+.ob-strip{position:absolute;top:0;left:0;right:0;padding:12px 24px;display:flex;align-items:center;gap:8px;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--f1-text-2)}
+.ob-strip .dot{width:6px;height:6px;border-radius:50%;background:var(--f1-red);animation:pulseDot 1.5s infinite}
+.ob-content{position:relative;z-index:2;width:min(640px,92vw);padding:80px 0 40px}
+.ob-step{display:none}.ob-step.active{display:block}
+.ob-eyebrow{font-size:11px;color:var(--f1-text-2);letter-spacing:.12em;margin-bottom:24px}
+.ob-headline{display:flex;flex-wrap:wrap;gap:.3em;justify-content:center;margin-bottom:40px}
+.ob-word{overflow:hidden;display:inline-block}
+.ob-word span{display:inline-block;animation:maskRevealUp .5s ease forwards;transform:translateY(110%)}
+.ob-dot{display:inline-block;width:10px;height:10px;background:var(--f1-red);border-radius:50%;margin-left:8px;animation:dotPop .4s .8s forwards;opacity:0;align-self:center}
+.ob-input{width:100%;background:transparent;border:none;border-bottom:2px solid var(--f1-border);color:var(--f1-text);font-family:"F1 Torque",sans-serif;font-style:italic;font-size:clamp(28px,6vw,48px);text-align:center;padding:12px 0;outline:none;transition:border-color .3s}
+.ob-input:focus{border-color:var(--f1-red)}
+.ob-btn{width:100%;margin-top:32px;padding:16px;background:var(--f1-mid);border:1px solid var(--f1-border);color:var(--f1-text);font-family:"F1 Regular",sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;position:relative;overflow:hidden;transition:color .3s}
+.ob-btn::before{content:'';position:absolute;inset:0;background:var(--f1-red);transform:translateX(-101%);transition:transform .35s}
+.ob-btn:not(:disabled):hover::before{transform:translateX(0)}
+.ob-btn:not(:disabled):hover{color:#fff}
+.ob-btn span{position:relative;z-index:1}
+.ob-btn:disabled{opacity:.35;cursor:not-allowed}
+.driver-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;max-height:50vh;overflow-y:auto}
+.driver-card{position:relative;padding:14px 12px;background:var(--f1-surface);border-left:4px solid var(--tc);cursor:pointer;transition:background .3s,color .3s;animation:drvIn .4s ease forwards;opacity:0}
+.driver-card:hover{background:var(--tc);color:#000}
+.driver-card.selected{background:var(--f1-black);color:#fff;border-left-width:10px}
+.driver-card .wm{position:absolute;right:4px;bottom:-8px;font-family:"F1 Torque",sans-serif;font-style:italic;font-size:48px;opacity:.12;color:var(--tc);line-height:1}
+.driver-card .code{font-size:13px;font-weight:700;color:var(--tc)}
+.driver-card:hover .code,.driver-card.selected .code{color:inherit}
+.driver-card .name{font-size:14px;margin:4px 0 2px}
+.driver-card .team{font-size:9px;color:var(--f1-text-2)}
+.driver-card:hover .team,.driver-card.selected .team{color:inherit;opacity:.7}
+.driver-card .check{position:absolute;top:6px;right:8px;color:var(--gold);font-size:16px;display:none}
+.driver-card.selected .check{display:block}
+.ob-callout{text-align:center;margin:16px 0;font-size:11px;color:var(--f1-text-2);min-height:18px}
+.particles{position:fixed;pointer-events:none;z-index:300}
+
+/* Splash */
+#splash{position:fixed;inset:0;z-index:300;background:var(--f1-black);display:flex;flex-direction:column;align-items:center;justify-content:center;transition:opacity .6s}
+#splash.out{opacity:0;pointer-events:none}
+.splash-logo{font-family:"F1 Torque",sans-serif;font-style:italic;font-size:clamp(80px,20vw,140px);color:var(--f1-text);display:flex;align-items:center;gap:4px}
+.splash-dot{width:14px;height:14px;background:var(--f1-red);border-radius:50%;animation:pulseDot 1s infinite}
+.splash-label{margin-top:16px;font-size:11px;letter-spacing:.2em;color:var(--f1-text-2)}
+.splash-bar{width:200px;height:3px;background:var(--f1-border);margin-top:24px;overflow:hidden;position:relative}
+.splash-bar::after{content:'';position:absolute;inset:0;background:var(--f1-red);animation:splashLoad 1.5s ease-in-out infinite}
+
+/* Skeletons */
+@keyframes skeletonPulse{0%,100%{opacity:.35}50%{opacity:.7}}
+.skeleton-row{height:36px;margin-bottom:4px;background:var(--f1-mid);animation:skeletonPulse 1.4s ease infinite}
+.skeleton-block{height:72px;background:var(--f1-mid);animation:skeletonPulse 1.4s ease infinite;margin-bottom:8px}
+.skeleton-chart{height:160px;background:var(--f1-mid);animation:skeletonPulse 1.4s ease infinite}
+.section-error{color:var(--f1-text-2);font-size:12px;padding:20px;text-align:center;border:1px dashed var(--f1-border)}
+
+/* App shell */
+.dashboard{opacity:0;transition:opacity .8s;display:flex;min-height:100vh;padding-bottom:36px}
+.dashboard.visible{opacity:1}
+.sidebar{width:220px;flex-shrink:0;background:var(--f1-black);border-right:1px solid var(--f1-border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:70;transition:transform .3s}
+.sidebar-logo{padding:18px 16px;border-bottom:1px solid var(--f1-border);display:flex;align-items:center;justify-content:center}
+.sidebar-logo img{width:100%;height:auto;display:block}
+.sidebar-nav{flex:1;overflow-y:auto;padding:12px 0}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 16px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--f1-text-2);cursor:pointer;border-left:3px solid transparent;transition:all .2s}
+.nav-item:hover,.nav-item.active{color:var(--f1-text);background:rgba(255,255,255,.04);border-left-color:var(--accent)}
+.nav-item svg{width:14px;height:14px;opacity:.6;flex-shrink:0}
+.sidebar-foot{padding:16px;border-top:1px solid var(--f1-border);font-size:10px}
+.sidebar-foot .sf-label{color:var(--f1-text-2);letter-spacing:.08em;margin-bottom:4px}
+.sidebar-foot .sf-val{font-size:12px;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.sidebar-foot .sf-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:69}
+.app-main{flex:1;margin-left:220px;display:flex;flex-direction:column;min-width:0}
+.topbar{height:52px;background:var(--f1-surface);border-bottom:1px solid var(--f1-border);display:flex;align-items:center;padding:0 16px;gap:16px;position:sticky;top:0;z-index:60}
+.menu-btn{display:none;background:none;border:none;color:var(--f1-text);font-size:18px;cursor:pointer;padding:4px 8px}
+.live-pill{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(225,6,0,.15);border:1px solid var(--f1-red);font-size:10px;letter-spacing:.1em;color:var(--f1-red);flex-shrink:0}
+.live-pill.off{opacity:.35;border-color:var(--f1-border);color:var(--f1-text-2);background:transparent}
+.live-pill .dot{width:6px;height:6px;background:var(--f1-red);border-radius:50%;animation:pulseDot 1.2s infinite}
+.live-pill.off .dot{background:var(--f1-text-2);animation:none}
+.topbar-race{font-family:"F1 Turbo",sans-serif;font-size:14px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px}
+.topbar-lap{font-size:11px;color:var(--f1-text-2);white-space:nowrap}
+.topbar-weather{display:flex;gap:12px;font-size:10px;color:var(--f1-text-2);margin-left:auto;flex-wrap:wrap}
+.topbar-weather span{white-space:nowrap}
+.topbar-weather b{color:var(--f1-text);font-weight:400}
+.topbar-lat{font-size:10px;color:var(--f1-text-2);padding:2px 8px;border:1px solid var(--f1-border)}
+.topbar-user{text-align:right;font-size:11px;flex-shrink:0}
+.topbar-user .name{font-family:"F1 Torque",sans-serif;font-style:italic;color:var(--f1-text)}
+.topbar-user .team{font-size:9px;color:var(--f1-text-2);letter-spacing:.06em}
+.topbar-icons{display:flex;gap:8px;margin-left:8px}
+.topbar-icons button{background:none;border:none;color:var(--f1-text-2);cursor:pointer;padding:6px;font-size:14px}
+.topbar-icons button:hover{color:var(--f1-text)}
+.main-scroll{flex:1;overflow-y:auto;padding:12px}
+.widget-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px;align-content:start}
+.widget{background:var(--f1-surface);border:1px solid var(--f1-border);display:flex;flex-direction:column;min-height:0;scroll-margin-top:68px}
+.widget.span-2{grid-column:span 2}.widget.span-3{grid-column:span 3}.widget.span-4{grid-column:span 4}.widget.span-5{grid-column:span 5}
+.widget-head{padding:10px 14px;border-bottom:1px solid var(--f1-border);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.widget-head .dot{width:6px;height:6px;background:var(--f1-red);border-radius:50%;flex-shrink:0}
+.widget-title{font-family:"F1 Turbo",sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:.06em}
+.widget-body{padding:12px 14px;flex:1;overflow:auto;min-height:0}
+.widget-body.compact{padding:8px 10px}
+.footer-ticker{position:fixed;bottom:0;left:0;right:0;height:32px;background:var(--f1-black);border-top:2px solid var(--f1-red);overflow:hidden;z-index:80;margin-left:220px}
+.footer-ticker:hover .ticker-track{animation-play-state:paused}
+.ticker-track{display:flex;white-space:nowrap;animation:ticker 48s linear infinite;font-size:10px;line-height:32px;color:var(--f1-text-2)}
+.ticker-track span{padding:0 20px}
+.panel-section{margin-top:24px;border:1px solid var(--f1-border);background:var(--f1-surface);scroll-margin-top:68px}
+.section-head{padding:14px 18px;border-bottom:1px solid var(--f1-border);display:flex;align-items:baseline;gap:8px}
+.section-num{font-family:"F1 Regular",sans-serif;font-size:11px;color:var(--f1-text-2)}
+.section-title{font-family:"F1 Turbo",sans-serif;font-weight:700;font-size:18px;text-transform:uppercase}
+.section-body{padding:16px 18px}
+
+/* Next race */
+.next-race{border-top:5px solid var(--f1-red)}
+.next-race-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:24px}
+.nr-round{font-size:10px;color:var(--f1-red);letter-spacing:.1em;margin-bottom:8px}
+.nr-flag{font-size:36px;animation:flagWave 2s ease-in-out infinite;display:inline-block}
+.nr-name{font-family:"F1 Turbo",sans-serif;font-size:clamp(24px,4vw,40px);margin:8px 0}
+.nr-circuit{font-size:13px;color:var(--f1-text-2);margin-bottom:16px}
+.nr-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;font-size:10px}
+.nr-stat label{display:block;color:var(--f1-text-2);margin-bottom:2px}
+.nr-stat val{font-size:13px;font-weight:600}
+.countdown-label{font-size:11px;color:var(--f1-text-2);display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.countdown-label .dot{width:6px;height:6px;background:var(--f1-red);border-radius:50%;animation:pulseDot 1.5s infinite}
+.countdown-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.cd-cell{background:var(--f1-mid);padding:16px 8px;text-align:center;border:1px solid var(--f1-border)}
+.cd-cell .num{font-family:"F1 Regular",sans-serif;font-size:clamp(24px,5vw,40px);font-variant-numeric:tabular-nums}
+.cd-cell .lbl{font-size:9px;color:var(--f1-text-2);margin-top:4px;letter-spacing:.1em}
+#wNextSession .widget-body{overflow:visible;padding:12px 14px}
+#wNextSession .countdown-grid{gap:10px}
+#wNextSession .cd-cell{min-width:0;padding:14px 6px}
+#wNextSession .cd-cell .num{font-size:clamp(22px,3vw,36px)}
+
+/* Calendar */
+.cal-wrap{overflow-x:auto;padding-bottom:8px}
+.cal-progress{height:3px;background:var(--f1-border);margin-bottom:12px}
+.cal-progress-fill{height:100%;background:var(--f1-red);transition:width 1s ease}
+.cal-strip{display:flex;gap:8px;min-width:max-content}
+.cal-card{width:130px;flex-shrink:0;border:2px solid var(--f1-border);padding:12px 10px;cursor:pointer;transition:all .2s;position:relative}
+.cal-card.done{opacity:.5}
+.cal-card.next{background:var(--f1-black);border-top:3px solid var(--f1-red);color:#fff}
+.cal-card.next .cal-dot{width:6px;height:6px;background:var(--f1-red);border-radius:50%;display:inline-block;animation:pulseDot 1.5s infinite}
+.cal-round{font-size:10px;color:var(--f1-text-2);display:flex;align-items:center;gap:4px}
+.cal-flag{font-size:20px;margin:6px 0}
+.cal-country{font-size:9px;color:var(--f1-text-2)}
+.cal-city{font-family:"F1 Turbo",sans-serif;font-size:16px;margin:2px 0}
+.cal-date{font-size:9px}
+.cal-winner{font-size:9px;color:var(--gold);margin-top:4px}
+
+.drs-zone{stroke:#3671C6;stroke-width:8;stroke-linecap:round;opacity:.6}
+.minimap-svg{width:100%;max-height:280px}
+.ontrack-svg{width:100%;height:auto;display:block}
+.ontrack-legend{display:flex;gap:16px;margin-top:8px;font-size:11px;flex-wrap:wrap}
+.legend-item{display:flex;align-items:center;gap:6px}
+.legend-dot{width:10px;height:10px;border-radius:2px}
+.next3-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.next3-card{padding:18px;border:1px solid var(--f1-border);background:var(--f1-surface)}
+.next3-card.primary{background:var(--f1-black);border-top:3px solid var(--f1-red)}
+.next3-eyebrow{font-size:10px;color:var(--f1-text-2);margin-bottom:8px}
+.next3-name{font-family:"F1 Turbo",sans-serif;font-size:20px;margin:8px 0}
+.next3-cd{font-family:"F1 Regular",sans-serif;font-size:12px;margin-top:12px;color:var(--f1-red);font-variant-numeric:tabular-nums}
+.main-grid{display:grid;grid-template-columns:1.1fr 1fr 1fr;border:1px solid var(--f1-border)}
+.main-grid .panel-section{margin:0;border:none;border-right:1px solid var(--f1-border)}
+.main-grid .panel-section:last-child{border-right:none}
+
+/* Tables */
+.data-table{width:100%;border-collapse:collapse;font-size:12px}
+.data-table th{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--f1-text-2);text-align:left;padding:8px 6px;border-bottom:1px solid var(--f1-border);font-family:"F1 Regular",sans-serif}
+.data-table td{padding:10px 6px;border-bottom:1px solid var(--f1-border);vertical-align:middle}
+.drv-row{animation:rowSlide .4s ease forwards;opacity:0;border-left:4px solid var(--tc)}
+.drv-row.leader{background:radial-gradient(ellipse at left,rgba(212,160,23,.12),transparent 70%)}
+.drv-row.user-row{box-shadow:inset 4px 0 0 var(--gold)}
+.drv-row .pos{font-family:"F1 Regular",sans-serif;font-variant-numeric:tabular-nums}
+.drv-row.leader .pos{color:var(--gold)}
+.code-badge{display:inline-block;padding:2px 6px;font-size:10px;border-radius:2px;font-family:"F1 Regular",sans-serif}
+.pts-big{font-size:20px;font-family:"F1 Regular",sans-serif;font-variant-numeric:tabular-nums}
+.gap-lead{color:var(--f1-red)}
+.con-bar{height:3px;background:var(--f1-border);margin-top:6px;overflow:hidden}
+.con-bar-fill{height:100%;background:var(--tc);transform-origin:left;animation:barGrow .8s ease forwards}
+.con-heritage{font-size:9px;color:var(--f1-text-2);margin-top:4px}
+.section-sub{font-size:10px;color:var(--f1-text-2);padding:10px 18px;border-top:1px solid var(--f1-border)}
+
+/* Paddock */
+.podium{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:20px}
+.podium-col{padding:16px;text-align:center;border:1px solid var(--f1-border);position:relative}
+.podium-col.p1{background:radial-gradient(ellipse at top,rgba(212,160,23,.15),transparent)}
+.podium-pos{font-family:"F1 Turbo",sans-serif;font-size:36px}
+.podium-name{font-family:"F1 Turbo",sans-serif;font-size:16px;margin:8px 0 4px}
+.podium-team{font-size:10px;color:var(--f1-text-2)}
+.podium-time{font-family:"F1 Regular",sans-serif;font-size:12px;margin-top:8px;font-variant-numeric:tabular-nums}
+.race-row:nth-child(even){background:rgba(255,255,255,.03)}
+.dnf{color:var(--f1-red)}
+.fl-dot{color:#a855f7}
+.sc-timeline{height:24px;background:var(--f1-mid);margin:16px 0;position:relative;border:1px solid var(--f1-border)}
+.sc-mark{position:absolute;top:0;bottom:0;width:3px;transform:translateX(-50%)}
+.sc-mark.sc{background:var(--f1-red)}
+.sc-mark.vsc{background:var(--gold)}
+.sc-label{position:absolute;top:-16px;font-size:8px;transform:translateX(-50%);white-space:nowrap}
+.rc-log{max-height:120px;overflow-y:auto;font-size:11px}
+.rc-item{padding:4px 0;border-bottom:1px solid var(--f1-border)}
+.rc-item.flag-green{color:#4ad07c}.rc-item.flag-yellow{color:var(--gold)}.rc-item.flag-red{color:var(--f1-red)}.rc-item.flag-orange{color:#ff8c42}
+.news-grid-full{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.news-card{padding:14px;border:1px solid var(--f1-border)}
+.news-kicker{font-size:9px;letter-spacing:.1em;padding:2px 8px;display:inline-block;margin-bottom:8px;border-radius:2px}
+.news-head{font-family:"F1 Turbo",sans-serif;font-size:15px;margin-bottom:6px}
+.news-body{font-size:12px;color:var(--f1-text-2);line-height:1.5}
+
+/* Tire strategy */
+.tire-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.tire-code{width:36px;font-weight:700;font-size:12px}
+.tire-track{flex:1;display:flex;height:28px;background:var(--f1-mid);border:1px solid var(--f1-border)}
+.tire-seg{display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;min-width:12px;cursor:default;position:relative}
+.tire-legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:10px}
+.tire-swatch{display:inline-block;width:12px;height:12px;margin-right:4px;vertical-align:middle}
+
+/* Qualifying */
+.qual-row.q1-out{opacity:.4}.qual-row.q2-out{opacity:.65}
+.qual-row.pole{border-left:4px solid var(--f1-red)}
+.qual-stripe{width:4px;height:100%;min-height:20px}
+
+/* Telemetry */
+.tel-controls{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+.tel-controls select{background:var(--f1-mid);border:1px solid var(--f1-border);color:var(--f1-text);padding:8px 12px;font-family:"F1 Regular",sans-serif;font-size:12px;min-width:180px}
+.tel-controls label{font-size:12px;display:flex;align-items:center;gap:6px}
+.tel-canvas{width:100%;display:block;margin-bottom:12px;background:var(--f1-black)}
+
+/* Weather */
+.weather-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.weather-card{background:var(--f1-mid);padding:16px;border:1px solid var(--f1-border)}
+.weather-card .lbl{font-size:10px;color:var(--f1-text-2);margin-bottom:8px}
+.weather-card .val{font-family:"F1 Torque",sans-serif;font-style:italic;font-size:28px}
+.weather-card .unit{font-size:11px;color:var(--f1-text-2)}
+.wind-arrow{display:inline-block;transition:transform .3s}
+
+/* Telemetry widget gauges */
+.tel-widget-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--f1-border)}
+.tel-widget-code{padding:3px 8px;font-size:11px;font-weight:700;border-radius:2px}
+.tel-widget-name{font-family:"F1 Turbo",sans-serif;font-size:14px;text-transform:uppercase}
+.tel-gauges{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.tel-gauge{text-align:center}
+.tel-gauge canvas{width:100%;max-width:90px;height:90px;display:block;margin:0 auto}
+.tel-gauge-lbl{font-size:8px;color:var(--f1-text-2);letter-spacing:.08em;margin-top:2px}
+.tel-bars{display:flex;flex-direction:column;gap:6px}
+.tel-bar-row{display:flex;align-items:center;gap:8px;font-size:9px;color:var(--f1-text-2)}
+.tel-bar-row span{width:42px;flex-shrink:0}
+.tel-bar-track{flex:1;height:8px;background:var(--f1-mid);border:1px solid var(--f1-border);overflow:hidden}
+.tel-bar-fill{height:100%;transform-origin:left;transition:width .15s}
+.tel-bar-fill.throttle{background:var(--mercedes)}.tel-bar-fill.brake{background:var(--f1-red)}.tel-bar-fill.ers{background:#a855f7}
+.track-map-body{display:flex;align-items:center;justify-content:center;min-height:180px;background:var(--f1-black)}
+.track-map-img{width:100%;max-height:220px;object-fit:contain;display:block}
+.track-map-img.hidden,.track-map-svg.hidden{display:none}
+.track-map-svg{width:100%;height:auto;display:block;max-height:220px}
+.gap-chart-canvas{width:100%;height:160px;display:block;background:var(--f1-black)}
+.pit-item{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--f1-border);font-size:11px}
+.pit-item .code{font-weight:700;width:32px}
+.standings-tabs{display:flex;gap:4px;margin-bottom:10px}
+.standings-tab{padding:4px 10px;font-size:10px;background:var(--f1-mid);border:1px solid var(--f1-border);cursor:pointer;color:var(--f1-text-2)}
+.standings-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+.circuit-photo{height:100px;background:linear-gradient(135deg,var(--f1-mid),var(--f1-black));border:1px solid var(--f1-border);margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:40px}
+.circuit-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;font-size:10px}
+.circuit-stats label{color:var(--f1-text-2);display:block}
+.circuit-stats val{font-size:12px}
+.weather-compact{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.weather-compact .wc{background:var(--f1-mid);padding:10px;border:1px solid var(--f1-border)}
+.weather-compact .wc .lbl{font-size:9px;color:var(--f1-text-2)}
+.weather-compact .wc .val{font-family:"F1 Torque",sans-serif;font-style:italic;font-size:20px}
+.news-grid{display:grid;grid-template-columns:1fr;gap:8px}
+.news-card{padding:12px;border:1px solid var(--f1-border)}
+.news-kicker{font-size:9px;letter-spacing:.1em;padding:2px 8px;display:inline-block;margin-bottom:6px;border-radius:2px}
+.news-head{font-family:"F1 Turbo",sans-serif;font-size:13px;margin-bottom:4px}
+.news-body{font-size:11px;color:var(--f1-text-2);line-height:1.4}
+.timing-table{font-size:11px;width:100%}
+.timing-table th{font-size:8px;text-transform:uppercase;color:var(--f1-text-2);text-align:left;padding:6px 4px;border-bottom:1px solid var(--f1-border);font-weight:400;letter-spacing:.06em}
+.timing-table td{padding:7px 4px;border-bottom:1px solid var(--f1-border);vertical-align:middle}
+.timing-table tr{border-left:3px solid var(--tc)}
+.timing-table tr.leader{background:radial-gradient(ellipse at left,rgba(212,160,23,.1),transparent 70%)}
+.timing-table .pos{font-variant-numeric:tabular-nums;width:24px}
+.timing-table .code{font-weight:700;font-size:10px}
+.comp-dot{display:inline-block;width:10px;height:10px;border-radius:50%;font-size:7px;text-align:center;line-height:10px;font-weight:700;color:#000}
+
+/* Spotlight */
+.spotlight{display:grid;grid-template-columns:1fr 1fr;gap:24px;position:relative;overflow:hidden}
+.spotlight-wm{position:absolute;right:-20px;top:50%;transform:translateY(-50%);font-family:"F1 Torque",sans-serif;font-style:italic;font-size:200px;opacity:.12;line-height:1;pointer-events:none}
+.spot-code{display:inline-block;padding:4px 10px;font-weight:700;font-size:14px;border-radius:2px;margin-bottom:12px}
+.spot-name{font-family:"F1 Turbo",sans-serif;font-size:40px;line-height:1.1;margin-bottom:8px}
+.spot-meta{font-size:11px;color:var(--f1-text-2);margin-bottom:20px}
+.spot-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+.spot-stat{background:var(--f1-mid);padding:12px;border:1px solid var(--f1-border)}
+.spot-stat .lbl{font-size:9px;color:var(--f1-text-2)}
+.spot-stat .val{font-family:"F1 Regular",sans-serif;font-size:18px;margin-top:4px;font-variant-numeric:tabular-nums}
+.result-pills{display:flex;gap:6px;flex-wrap:wrap}
+.result-pill{text-align:center}
+.pill{width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;border-radius:2px;border:1px solid var(--f1-border)}
+.pill.p1{background:var(--gold);color:#000}.pill.p2{background:var(--silver);color:#000}.pill.p3{background:var(--bronze);color:#fff}
+.pill.p4-10{background:var(--f1-mid);color:#4ad07c}.pill.p11{background:var(--f1-grey);color:var(--f1-text-2)}.pill.dnf{background:var(--f1-red);color:#fff}
+.pill-race{font-size:8px;color:var(--f1-text-2);margin-top:2px}
+.spot-actions{display:flex;gap:8px;flex-wrap:wrap}
+.btn-action{padding:12px 20px;background:var(--f1-mid);border:1px solid var(--f1-border);color:var(--f1-text);font-family:"F1 Regular",sans-serif;font-size:11px;letter-spacing:.08em;cursor:pointer;transition:all .2s}
+.btn-action:hover{background:var(--f1-red);border-color:var(--f1-red)}
+
+/* Live timing full panel */
+#liveTimingPanel{display:none}
+
+/* Chips & popups */
+.chip{position:fixed;z-index:90;padding:10px 14px;background:var(--f1-surface);border:1px solid var(--f1-border);font-size:11px;cursor:pointer;display:flex;align-items:center;gap:8px;transition:border-color .2s,background .2s;font-family:"F1 Regular",sans-serif}
+.chip:hover{border-color:var(--accent);background:var(--f1-mid)}
+#installChip{bottom:48px;left:16px;display:none}
+#installTooltip{bottom:88px;left:16px;top:auto;background:var(--f1-mid);border:1px solid var(--f1-border);padding:10px 14px;font-size:11px;max-width:220px;display:none;z-index:91;position:fixed}
+#installChip.show{display:flex}
+#thanksPopup{position:fixed;right:16px;width:min(340px,92vw);background:var(--f1-surface);border:1px solid var(--f1-border);border-top:4px solid var(--accent);padding:20px;z-index:85;display:none}
+#thanksPopup.show{display:block}
+.thanks-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.thanks-btns button{flex:1;min-width:120px;padding:10px;font-size:11px;border:1px solid var(--f1-border);background:var(--f1-mid);color:var(--f1-text);cursor:pointer;font-family:"F1 Regular",sans-serif}
+.thanks-btns button.primary{background:var(--accent);border-color:var(--accent)}
+.thanks-skip{font-size:10px;color:var(--f1-text-2);margin-top:10px;cursor:pointer;text-decoration:underline}
+
+/* Share canvas hidden */
+#shareCanvas{display:none}
+
+/* Responsive */
+@media(max-width:1200px){.widget.span-5{grid-column:span 12}.widget.span-4{grid-column:span 6}.widget.span-3{grid-column:span 6}.widget.span-2{grid-column:span 6}.main-grid{grid-template-columns:1fr 1fr}.main-grid .panel-section:nth-child(3){grid-column:1/-1}}
+@media(max-width:960px){.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.sidebar-overlay.show{display:block}.app-main,.footer-ticker{margin-left:0}.menu-btn{display:block}.widget.span-4,.widget.span-3,.widget.span-2{grid-column:span 12}.topbar-weather{display:none}.main-grid{grid-template-columns:1fr}.next-race-grid{grid-template-columns:1fr}.spotlight{grid-template-columns:1fr}.next3-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.driver-grid{grid-template-columns:repeat(2,1fr)}.countdown-grid .num{font-size:24px}.qual-q1,.qual-q2{display:none}.weather-grid{grid-template-columns:repeat(2,1fr)}.next3-grid{grid-template-columns:1fr}.news-grid-full{grid-template-columns:1fr}.podium{grid-template-columns:1fr}.nr-stats{grid-template-columns:repeat(2,1fr)}.topbar-race{max-width:120px;font-size:11px}}
+</style>
+</head>
+<body>
+
+<div id="onboarding">
+  <div class="ob-orb ob-orb1"></div><div class="ob-orb ob-orb2"></div><div class="ob-orb ob-orb3"></div>
+  <div class="ob-speed" style="top:25%;animation-delay:0s"></div>
+  <div class="ob-speed" style="top:55%;animation-delay:2s"></div>
+  <div class="ob-speed" style="top:75%;animation-delay:4s"></div>
+  <div class="ob-crop tl"></div><div class="ob-crop tr"></div><div class="ob-crop bl"></div><div class="ob-crop br"></div>
+  <div class="ob-strip"><span class="dot"></span>THE PIT WALL · F1 2026 · LIGHTS OUT</div>
+  <div class="ob-content">
+    <div class="ob-step active" id="obStep1">
+      <div class="ob-eyebrow mono">01 / 02 · THE BYLINE</div>
+      <div class="ob-headline f1-display" id="obHeadline1"></div>
+      <input class="ob-input" id="obName" type="text" placeholder="Your name" maxlength="40" autocomplete="off">
+      <button class="ob-btn" id="obContinue1" disabled><span>CONTINUE →</span></button>
+    </div>
+    <div class="ob-step" id="obStep2">
+      <div class="ob-eyebrow mono">02 / 02 · YOUR DRIVER</div>
+      <div class="ob-headline f1-display" id="obHeadline2"></div>
+      <div class="driver-grid" id="driverGrid"></div>
+      <div class="ob-callout mono" id="obCallout"></div>
+      <button class="ob-btn" id="obConfirm" disabled><span>ENTER THE PIT WALL →</span></button>
+    </div>
+  </div>
+</div>
+
+<div id="splash">
+  <div class="splash-logo">F<span class="splash-dot"></span>1</div>
+  <div class="splash-label mono">LOADING TELEMETRY</div>
+  <div class="splash-bar"></div>
+</div>
+
+<div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+<div class="dashboard" id="dashboard">
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo"><img src="assets/f1-logo.png?v=2" alt="Formula 1"></div>
+  <nav class="sidebar-nav" id="sidebarNav">
+    <a class="nav-item active" data-target="wLiveTiming"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>Dashboard</a>
+    <a class="nav-item" data-target="wLiveTiming"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Live Timing</a>
+    <a class="nav-item" data-target="wRaceControl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>Race Control</a>
+    <a class="nav-item" data-target="wCircuit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>Circuit Info</a>
+    <a class="nav-item" data-target="panelDrivers"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Drivers</a>
+    <a class="nav-item" data-target="panelTeams"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Teams</a>
+    <a class="nav-item" data-target="wStandings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Standings</a>
+    <a class="nav-item" data-target="panelCalendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>Calendar</a>
+    <a class="nav-item" data-target="wNews"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/></svg>News</a>
+    <a class="nav-item" data-target="panelStatistics"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>Statistics</a>
+    <a class="nav-item" data-target="panelSettings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</a>
+  </nav>
+  <div class="sidebar-foot">
+    <div class="sf-label mono">MY TEAM</div>
+    <div class="sf-val mono" id="sidebarMyTeam"><span class="sf-dot" id="sidebarTeamDot"></span><span id="sidebarTeamName">—</span></div>
+    <div class="sf-label mono">MY DRIVER</div>
+    <div class="sf-val mono" id="sidebarMyDriver"><span class="sf-dot" id="sidebarDriverDot"></span><span id="sidebarDriverName">—</span></div>
+  </div>
+</aside>
+
+<div class="app-main">
+<header class="topbar">
+  <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+  <div class="live-pill off" id="topbarLiveBadge"><span class="dot"></span><span id="topbarLiveText">OFFLINE</span></div>
+  <div class="topbar-race f1-display" id="topbarRaceName">F1 2026</div>
+  <div class="topbar-lap mono" id="topbarLapCounter">LAP —/—</div>
+  <div class="topbar-weather mono" id="topbarWeather">
+    <span>AIR <b id="topbarAir">—</b>°C</span>
+    <span>TRACK <b id="topbarTrack">—</b>°C</span>
+    <span>HUM <b id="topbarHumidity">—</b>%</span>
+    <span>WIND <b id="topbarWind">—</b> km/h</span>
+  </div>
+  <div class="topbar-lat mono" id="topbarLatency">— ms</div>
+  <div class="topbar-user">
+    <div class="name" id="topbarUserName">Fan</div>
+    <div class="team" id="topbarTeamFan">—</div>
+  </div>
+  <div class="topbar-icons">
+    <button id="searchBtn" title="Search">⌕</button>
+    <button id="notifBtn" title="Notifications">◉</button>
+  </div>
+</header>
+
+<main class="main-scroll">
+<div class="widget-grid">
+
+<div class="widget span-5" id="wLiveTiming">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Live Timing</span></div>
+  <div class="widget-body compact"><table class="timing-table"><thead><tr><th>POS</th><th>DRIVER</th><th>GAP</th><th>INT</th><th>TYRE</th><th>LAST LAP</th><th>S1</th><th>S2</th><th>S3</th></tr></thead><tbody id="wLiveTimingBody"></tbody></table></div>
+</div>
+
+<div class="widget span-4" id="wTrackMap">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Track Map</span></div>
+  <div class="widget-body compact track-map-body">
+    <img class="track-map-img hidden" id="wTrackMapImg" alt="">
+    <svg class="track-map-svg" id="wTrackMapSvg" viewBox="0 0 400 280"></svg>
+  </div>
+</div>
+
+<div class="widget span-3" id="wCircuit">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Circuit Info</span></div>
+  <div class="widget-body compact">
+    <div class="circuit-photo" id="circuitPhoto">🏁</div>
+    <div class="nr-round mono" id="nrRound"></div>
+    <div class="nr-name f1-display" id="nrName" style="font-size:16px;margin:4px 0"></div>
+    <div class="nr-circuit mono" id="nrCircuit" style="font-size:10px;margin-bottom:8px"></div>
+    <div class="circuit-stats mono" id="nrStats"></div>
+  </div>
+</div>
+
+<div class="widget span-3">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Race Control</span></div>
+  <div class="widget-body compact"><div class="rc-log" id="wRaceControl"></div></div>
+</div>
+
+<div class="widget span-2">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Pit Stops</span></div>
+  <div class="widget-body compact" id="wPitStopsBody"></div>
+</div>
+
+<div class="widget span-4" id="wGapChart">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Live Gap Chart</span></div>
+  <div class="widget-body compact"><canvas class="gap-chart-canvas" id="wGapChartCanvas" height="160"></canvas></div>
+</div>
+
+<div class="widget span-3">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Tyre Strategy</span></div>
+  <div class="widget-body compact" id="wTyreStrategy"></div>
+</div>
+
+<div class="widget span-3">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Weather</span></div>
+  <div class="widget-body compact"><div class="weather-compact" id="wWeather"></div><div class="mono" style="font-size:8px;color:var(--f1-text-2);margin-top:8px" id="weatherSource"></div></div>
+</div>
+
+<div class="widget span-5">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">F1 News</span></div>
+  <div class="widget-body compact"><div class="news-grid" id="wNews"></div></div>
+</div>
+
+<div class="widget span-3">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Championship</span></div>
+  <div class="widget-body compact">
+    <div class="standings-tabs"><button class="standings-tab active mono" data-tab="drivers">Drivers</button><button class="standings-tab mono" data-tab="constructors">Constructors</button></div>
+    <div id="wStandings"></div>
+  </div>
+</div>
+
+<div class="widget span-4" id="wNextSession">
+  <div class="widget-head"><span class="dot"></span><span class="widget-title">Next Session</span></div>
+  <div class="widget-body compact">
+    <div class="countdown-label mono"><span class="dot"></span><span id="wNextSessionLabel">LIGHTS OUT IN</span></div>
+    <div class="countdown-grid">
+      <div class="cd-cell"><div class="num" id="cdD">00</div><div class="lbl">DAYS</div></div>
+      <div class="cd-cell"><div class="num" id="cdH">00</div><div class="lbl">HRS</div></div>
+      <div class="cd-cell"><div class="num" id="cdM">00</div><div class="lbl">MIN</div></div>
+      <div class="cd-cell"><div class="num" id="cdS">00</div><div class="lbl">SEC</div></div>
+    </div>
+  </div>
+</div>
+
+</div><!-- widget-grid -->
+
+<div class="panel-section hidden" id="panelDrivers">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Drivers' Championship</span></div>
+  <div class="section-body" id="driversBody"></div>
+  <div class="section-sub mono" id="driversSub"></div>
+</div>
+
+<div class="panel-section hidden" id="panelTeams">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Constructors' Cup</span></div>
+  <div class="section-body" id="constructorsBody"></div>
+</div>
+
+<div class="panel-section hidden" id="panelCalendar">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Season Calendar</span></div>
+  <div class="section-body">
+    <div class="cal-progress"><div class="cal-progress-fill" id="calProgress"></div></div>
+    <div class="cal-wrap"><div class="cal-strip" id="calStrip"></div></div>
+    <div class="next3-grid" id="next3Grid" style="margin-top:16px"></div>
+  </div>
+</div>
+
+<div class="panel-section hidden" id="panelStatistics">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Championship History</span></div>
+  <div class="section-body"><canvas class="tel-canvas" id="historyChart" height="280"></canvas></div>
+</div>
+
+<div class="panel-section hidden" id="panelTelemetry">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Telemetry Viewer</span></div>
+  <div class="section-body">
+    <div class="tel-controls">
+      <select id="telDriver1"></select>
+      <label><input type="checkbox" id="telCompare"> Compare</label>
+      <select id="telDriver2" class="hidden"></select>
+    </div>
+    <canvas class="tel-canvas" id="telSpeed" height="160"></canvas>
+    <canvas class="tel-canvas" id="telMap" height="220"></canvas>
+    <canvas class="tel-canvas hidden" id="telDelta" height="120"></canvas>
+    <div class="mono" style="font-size:10px;color:var(--f1-text-2)" id="telMeta"></div>
+  </div>
+</div>
+
+<div class="panel-section hidden" id="panelPaddock">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Paddock Intel</span></div>
+  <div class="section-body" id="paddockBody"></div>
+</div>
+
+<div class="panel-section hidden" id="panelQuali">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Qualifying Recap</span></div>
+  <div class="section-body" id="qualiBody"></div>
+</div>
+
+<div class="panel-section hidden" id="panelSpotlight">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Driver Spotlight</span></div>
+  <div class="section-body spotlight" id="spotlightBody"></div>
+</div>
+
+<div class="panel-section hidden" id="panelSettings">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Settings</span></div>
+  <div class="section-body">
+    <button class="btn-action" id="settingsEditProfile">EDIT PROFILE</button>
+    <button class="btn-action" id="settingsInstall" style="margin-left:8px">INSTALL APP</button>
+    <div class="mono" style="font-size:11px;color:var(--f1-text-2);margin-top:16px">F1 2026 Race Control Dashboard · Data via FastF1 API</div>
+  </div>
+</div>
+
+<div class="panel-section hidden" id="liveTimingPanel">
+  <div class="section-head"><span class="section-num mono">§</span><span class="section-title f1-display">Full Live Timing</span></div>
+  <div class="section-body"><div id="liveGrid"></div><div class="rc-log" id="liveRcLog"></div></div>
+</div>
+
+</main>
+</div>
+</div>
+
+<footer class="footer-ticker"><div class="ticker-track mono" id="footerTicker"></div></footer>
+
+<canvas id="shareCanvas" width="1080" height="1080"></canvas>
+
+<div class="chip" id="installChip">⬇ INSTALL APP</div>
+<div id="installTooltip" class="mono">Tap Share → Add to Home Screen</div>
+
+<div id="thanksPopup">
+  <div class="f1-display" style="font-size:16px;margin-bottom:4px" id="thanksTitle"></div>
+  <div class="thanks-btns">
+    <button class="primary" id="thanksTip">Tip via Ko-fi</button>
+  </div>
+  <div class="thanks-skip" id="thanksSkip">Skip for now</div>
+</div>
+
+<script>
+
+const API_BASE = (() => {
+  const m = document.querySelector('meta[name="api-base"]');
+  if (m && m.content) return m.content.replace(/\/$/, '');
+  return location.hostname === 'localhost' || location.hostname === '127.0.0.1' ? 'http://localhost:8000' : '';
+})();
+
+const STORAGE_KEY = 'f1-dashboard:v1';
+const DEFAULT_CFG = { name: 'Fan', driverCode: 'NOR', teamId: 'mclaren' };
+const POLL_MS = 5 * 60 * 1000;
+const LIVE_POLL_MS = 15000;
+const API_TIMEOUT = 30000;
+const API_RETRIES = 2;
+let __latestData = {};
+let __pollTimer = null;
+let __liveTimer = null;
+let __countdownTimer = null;
+let __firstRender = true;
+let __selectedRound = null;
+let __telemetry1 = null;
+let __telemetry2 = null;
+let __historyData = null;
+let __driverData = null;
+let __weatherData = null;
+let __tireData = null;
+let __qualiData = null;
+let __lastRaceData = null;
+let __liveData = null;
+let __deferredPrompt = null;
+let __historyDrawn = false;
+let __historyAnimId = null;
+let __telFetching = false;
+let __telReqId = 0;
+let __gapHistory = {};
+let __apiLatency = null;
+let __standingsTab = 'drivers';
+let __trackData = {configured:false,tracks:[]};
+
+const DRIVERS_2026 = [
+  {code:"VER",number:1,given_name:"Max",family_name:"Verstappen",team_id:"red_bull",team_name:"Red Bull Racing",nationality:"NED"},
+  {code:"TSU",number:22,given_name:"Yuki",family_name:"Tsunoda",team_id:"red_bull",team_name:"Red Bull Racing",nationality:"JPN"},
+  {code:"NOR",number:4,given_name:"Lando",family_name:"Norris",team_id:"mclaren",team_name:"McLaren",nationality:"GBR"},
+  {code:"PIA",number:81,given_name:"Oscar",family_name:"Piastri",team_id:"mclaren",team_name:"McLaren",nationality:"AUS"},
+  {code:"LEC",number:16,given_name:"Charles",family_name:"Leclerc",team_id:"ferrari",team_name:"Ferrari",nationality:"MON"},
+  {code:"HAM",number:44,given_name:"Lewis",family_name:"Hamilton",team_id:"ferrari",team_name:"Ferrari",nationality:"GBR"},
+  {code:"RUS",number:63,given_name:"George",family_name:"Russell",team_id:"mercedes",team_name:"Mercedes",nationality:"GBR"},
+  {code:"ANT",number:12,given_name:"Kimi",family_name:"Antonelli",team_id:"mercedes",team_name:"Mercedes",nationality:"ITA"},
+  {code:"ALO",number:14,given_name:"Fernando",family_name:"Alonso",team_id:"aston_martin",team_name:"Aston Martin",nationality:"ESP"},
+  {code:"STR",number:18,given_name:"Lance",family_name:"Stroll",team_id:"aston_martin",team_name:"Aston Martin",nationality:"CAN"},
+  {code:"GAS",number:10,given_name:"Pierre",family_name:"Gasly",team_id:"alpine",team_name:"Alpine",nationality:"FRA"},
+  {code:"DOO",number:7,given_name:"Jack",family_name:"Doohan",team_id:"alpine",team_name:"Alpine",nationality:"AUS"},
+  {code:"HUL",number:27,given_name:"Nico",family_name:"Hulkenberg",team_id:"audi",team_name:"Audi",nationality:"GER"},
+  {code:"BOR",number:5,given_name:"Gabriel",family_name:"Bortoleto",team_id:"audi",team_name:"Audi",nationality:"BRA"},
+  {code:"LAW",number:30,given_name:"Liam",family_name:"Lawson",team_id:"racing_bulls",team_name:"Racing Bulls",nationality:"NZL"},
+  {code:"HAD",number:6,given_name:"Isack",family_name:"Hadjar",team_id:"racing_bulls",team_name:"Racing Bulls",nationality:"FRA"},
+  {code:"OCO",number:31,given_name:"Esteban",family_name:"Ocon",team_id:"haas",team_name:"Haas F1 Team",nationality:"FRA"},
+  {code:"BEA",number:87,given_name:"Oliver",family_name:"Bearman",team_id:"haas",team_name:"Haas F1 Team",nationality:"GBR"},
+  {code:"ALB",number:23,given_name:"Alexander",family_name:"Albon",team_id:"williams",team_name:"Williams",nationality:"THA"},
+  {code:"SAI",number:55,given_name:"Carlos",family_name:"Sainz",team_id:"williams",team_name:"Williams",nationality:"ESP"},
+  {code:"BOT",number:77,given_name:"Valtteri",family_name:"Bottas",team_id:"cadillac",team_name:"Cadillac F1 Team",nationality:"FIN"},
+  {code:"PER",number:11,given_name:"Sergio",family_name:"Perez",team_id:"cadillac",team_name:"Cadillac F1 Team",nationality:"MEX"}
+];
+
+const TEAM_COLORS = {
+  mercedes:"#27F4D2",ferrari:"#E8002D",mclaren:"#FF8000",red_bull:"#3671C6",redbull:"#3671C6",
+  williams:"#64C4FF",haas:"#B6BABD",alpine:"#0093CC",audi:"#00877C",racing_bulls:"#6692FF",
+  racingbulls:"#6692FF",rb:"#6692FF",aston_martin:"#229971",aston:"#229971",cadillac:"#8A9099"
+};
+
+const COMPOUND_COLORS = {SOFT:"#ff7575",MEDIUM:"#ffd84d",HARD:"#f0f0f0",INTERMEDIATE:"#4ad07c",INTER:"#4ad07c",WET:"#4a8fd0",UNKNOWN:"#888"};
+
+const COUNTRY_FLAGS = {
+  Bahrain:"🇧🇭",Jeddah:"🇸🇦",Saudi:"🇸🇦","Saudi Arabia":"🇸🇦",Australia:"🇦🇺",China:"🇨🇳",Japan:"🇯🇵",
+  Miami:"🇺🇸","United States":"🇺🇸",USA:"🇺🇸",Emilia:"🇮🇹",Italy:"🇮🇹",Monaco:"🇲🇨",Canada:"🇨🇦",Spain:"🇪🇸",
+  Austria:"🇦🇹",Britain:"🇬🇧","Great Britain":"🇬🇧",UK:"🇬🇧",Belgium:"🇧🇪",Hungary:"🇭🇺",Netherlands:"🇳🇱",
+  Singapore:"🇸🇬",Azerbaijan:"🇦🇿",Mexico:"🇲🇽",Brazil:"🇧🇷",Qatar:"🇶🇦","Abu Dhabi":"🇦🇪",UAE:"🇦🇪",
+  France:"🇫🇷",Germany:"🇩🇪",Monaco:"🇲🇨",Portugal:"🇵🇹",Turkey:"🇹🇷",Russia:"🇷🇺",Korea:"🇰🇷",
+  India:"🇮🇳",Malaysia:"🇲🇾",Baku:"🇦🇿",Las:"🇺🇸",Austin:"🇺🇸",Montreal:"🇨🇦",Monza:"🇮🇹",Imola:"🇮🇹",
+  Silverstone:"🇬🇧",Spa:"🇧🇪",Zandvoort:"🇳🇱",Suzuka:"🇯🇵",Melbourne:"🇦🇺",Barcelona:"🇪🇸",
+  Montreal:"🇨🇦",Interlagos:"🇧🇷","São Paulo":"🇧🇷","Sao Paulo":"🇧🇷",Mexico:"🇲🇽","Mexico City":"🇲🇽"
+};
+
+const TEAM_HERITAGE = {
+  ferrari:{titles:16,since:1950,last:2008},mclaren:{titles:8,since:1966,last:1998},mercedes:{titles:8,since:1954,last:2021},
+  red_bull:{titles:6,since:2005,last:2024},williams:{titles:9,since:1977,last:1997},alpine:{titles:2,since:1977,last:2006},
+  aston_martin:{titles:0,since:1959,last:0},haas:{titles:0,since:2016,last:0},audi:{titles:0,since:2026,last:0},
+  racing_bulls:{titles:0,since:2006,last:0},cadillac:{titles:0,since:2026,last:0}
+};
+
+const CIRCUIT_META = {
+  bahrain:{laps:57,length:5.412,record:"1:31.447",recordHolder:"Pedro de la Rosa",pole2025:"Oscar Piastri",dates:"Apr 12–14"},
+  jeddah:{laps:50,length:6.174,record:"1:27.293",recordHolder:"Lewis Hamilton",pole2025:"Max Verstappen",dates:"Apr 19–21"},
+  melbourne:{laps:58,length:5.278,record:"1:19.813",recordHolder:"Charles Leclerc",pole2025:"Lando Norris",dates:"Mar 14–16"},
+  suzuka:{laps:53,length:5.807,record:"1:30.983",recordHolder:"Lewis Hamilton",pole2025:"Max Verstappen",dates:"Apr 05–07"},
+  shanghai:{laps:56,length:5.451,record:"1:32.238",recordHolder:"Michael Schumacher",pole2025:"Lando Norris",dates:"Mar 21–23"},
+  miami:{laps:57,length:5.412,record:"1:29.708",recordHolder:"Max Verstappen",pole2025:"Oscar Piastri",dates:"May 02–04"},
+  imola:{laps:63,length:4.909,record:"1:15.484",recordHolder:"Lewis Hamilton",pole2025:"Max Verstappen",dates:"May 16–18"},
+  monaco:{laps:78,length:3.337,record:"1:12.909",recordHolder:"Lewis Hamilton",pole2025:"Charles Leclerc",dates:"May 23–25"},
+  montreal:{laps:70,length:4.361,record:"1:13.078",recordHolder:"Valtteri Bottas",pole2025:"George Russell",dates:"Jun 06–08"},
+  barcelona:{laps:66,length:4.675,record:"1:16.330",recordHolder:"Max Verstappen",pole2025:"Lando Norris",dates:"Jun 13–15"},
+  spielberg:{laps:71,length:4.318,record:"1:05.619",recordHolder:"Carlos Sainz",pole2025:"Max Verstappen",dates:"Jun 27–29"},
+  silverstone:{laps:52,length:5.891,record:"1:27.097",recordHolder:"Max Verstappen",pole2025:"George Russell",dates:"Jul 04–06"},
+  spa:{laps:44,length:7.004,record:"1:46.286",recordHolder:"Lewis Hamilton",pole2025:"Charles Leclerc",dates:"Jul 25–27"},
+  hungaroring:{laps:70,length:4.381,record:"1:16.627",recordHolder:"Lewis Hamilton",pole2025:"Lando Norris",dates:"Aug 01–03"},
+  zandvoort:{laps:72,length:4.259,record:"1:11.097",recordHolder:"Lewis Hamilton",pole2025:"Max Verstappen",dates:"Aug 29–31"},
+  monza:{laps:53,length:5.793,record:"1:21.046",recordHolder:"Rubens Barrichello",pole2025:"Lando Norris",dates:"Sep 05–07"},
+  baku:{laps:51,length:6.003,record:"1:43.009",recordHolder:"Charles Leclerc",pole2025:"Charles Leclerc",dates:"Sep 19–21"},
+  marina_bay:{laps:62,length:4.940,record:"1:35.867",recordHolder:"George Russell",pole2025:"Lando Norris",dates:"Oct 03–05"},
+  cota:{laps:56,length:5.513,record:"1:36.169",recordHolder:"Charles Leclerc",pole2025:"Lando Norris",dates:"Oct 17–19"},
+  mexico_city:{laps:71,length:4.304,record:"1:17.774",recordHolder:"Valtteri Bottas",pole2025:"Max Verstappen",dates:"Oct 24–26"},
+  interlagos:{laps:71,length:4.309,record:"1:10.540",recordHolder:"Valtteri Bottas",pole2025:"Lando Norris",dates:"Nov 07–09"},
+  las_vegas:{laps:50,length:6.120,record:"1:35.490",recordHolder:"Charles Leclerc",pole2025:"George Russell",dates:"Nov 21–23"}
+};
+
+const CIRCUIT_PATHS = {
+  bahrain:"M60,140 C60,80 120,50 180,60 C240,70 280,120 300,160 C320,200 280,230 220,240 C160,250 80,220 60,140 Z",
+  jeddah:"M40,120 C80,40 160,30 260,50 C340,65 360,110 340,160 C310,210 220,230 140,210 C70,195 30,160 40,120 Z",
+  melbourne:"M50,150 C90,60 200,40 280,80 C340,110 350,170 300,210 C230,250 120,230 70,190 C40,165 35,175 50,150 Z",
+  suzuka:"M80,200 C120,80 220,40 300,70 C360,90 380,140 350,180 C300,230 200,250 140,220 C90,195 60,220 80,200 Z M200,120 C230,100 270,110 280,140 C270,170 230,175 200,160 C185,145 185,130 200,120 Z",
+  shanghai:"M60,180 C100,60 220,40 310,90 C360,120 370,170 330,210 C270,260 150,240 90,200 C50,170 40,200 60,180 Z",
+  miami:"M50,130 C100,50 220,35 310,70 C360,95 365,150 320,190 C250,240 120,220 70,180 C40,155 35,145 50,130 Z",
+  imola:"M70,160 C110,70 200,50 270,90 C320,120 330,170 290,210 C230,255 130,240 80,200 C50,175 55,175 70,160 Z",
+  monaco:"M90,170 C130,90 220,70 290,100 C330,120 340,160 310,195 C260,235 160,230 110,200 C80,180 75,185 90,170 Z",
+  montreal:"M55,145 C95,55 210,45 295,85 C345,115 355,165 310,205 C240,250 120,230 65,190 C40,168 42,158 55,145 Z",
+  barcelona:"M65,155 C105,65 215,50 300,85 C350,110 360,165 315,205 C245,250 125,235 70,195 C45,172 48,162 65,155 Z",
+  spielberg:"M80,170 C120,80 210,55 290,85 C340,105 350,155 310,200 C250,250 140,235 90,195 C65,172 68,178 80,170 Z",
+  silverstone:"M50,150 C90,55 210,40 310,75 C365,100 375,160 330,205 C255,255 130,240 70,195 C42,170 44,158 50,150 Z",
+  spa:"M45,160 C85,50 220,35 330,80 C380,105 390,165 345,215 C265,270 120,250 60,200 C35,175 38,168 45,160 Z",
+  hungaroring:"M75,165 C115,75 210,55 285,90 C330,115 340,165 300,205 C240,250 130,235 80,195 C55,172 58,170 75,165 Z",
+  zandvoort:"M85,175 C125,85 215,60 295,90 C340,110 350,160 310,205 C250,250 140,235 90,195 C65,172 68,178 85,175 Z",
+  monza:"M55,140 C95,50 215,35 315,70 C370,95 380,155 335,200 C260,250 125,235 65,190 C38,168 40,150 55,140 Z",
+  baku:"M40,130 C90,40 230,30 340,70 C385,95 395,155 350,200 C270,255 110,235 55,185 C30,160 32,145 40,130 Z",
+  marina_bay:"M70,170 C110,80 220,55 310,90 C355,115 365,165 320,210 C250,255 130,240 80,200 C55,177 58,175 70,170 Z",
+  cota:"M60,155 C100,60 220,45 315,80 C365,105 375,165 330,210 C255,255 125,240 65,195 C38,172 42,160 60,155 Z",
+  mexico_city:"M75,160 C115,70 215,50 295,85 C340,110 350,165 310,210 C245,255 130,240 80,200 C55,177 58,172 75,160 Z",
+  interlagos:"M80,165 C120,75 215,55 295,90 C340,115 350,165 310,210 C245,255 130,240 85,200 C60,177 63,172 80,165 Z",
+  las_vegas:"M50,145 C95,55 225,40 330,75 C380,100 390,160 345,205 C265,255 115,235 60,190 C35,167 38,155 50,145 Z"
+};
+
+const TRACK_SHAPES = {
+  street_tight:"M50,55 C120,20 280,15 400,35 C520,55 600,40 700,50 C820,62 950,45 1050,55 C1150,63 1280,48 1350,55",
+  sweeping_fast:"M50,55 C200,80 350,25 500,55 C650,85 800,30 950,55 C1100,80 1250,35 1350,55",
+  long_straights:"M50,55 L350,55 C400,55 420,30 450,55 L750,55 C800,55 820,80 850,55 L1150,55 C1200,55 1220,30 1250,55 L1350,55",
+  technical:"M50,55 C150,75 200,35 300,55 C400,75 450,35 550,55 C650,75 700,35 800,55 C900,75 950,35 1050,55 C1150,75 1200,35 1300,55",
+  figure8:"M50,55 C200,20 350,90 500,55 C650,20 800,90 950,55 C1100,20 1250,90 1350,55",
+  modern_flow:"M50,55 C180,70 280,40 400,55 C520,70 620,40 740,55 C860,70 960,40 1080,55 C1200,70 1280,45 1350,55",
+  default:"M50,55 C250,30 500,80 750,55 C1000,30 1150,80 1350,55"
+};
+
+const CIRCUIT_SHAPE_MAP = {
+  bahrain:"sweeping_fast",jeddah:"long_straights",melbourne:"modern_flow",suzuka:"figure8",shanghai:"technical",
+  miami:"street_tight",imola:"technical",monaco:"street_tight",montreal:"sweeping_fast",barcelona:"modern_flow",
+  spielberg:"sweeping_fast",silverstone:"sweeping_fast",spa:"long_straights",hungaroring:"technical",zandvoort:"sweeping_fast",
+  monza:"long_straights",baku:"street_tight",marina_bay:"street_tight",cota:"modern_flow",mexico_city:"sweeping_fast",
+  interlagos:"technical",las_vegas:"street_tight"
+};
+
+function esc(s){const d=document.createElement('div');d.textContent=s??'';return d.innerHTML;}
+function getTeamColor(id){if(!id)return'#888';const k=String(id).toLowerCase().replace(/ /g,'_');return TEAM_COLORS[k]||'#888';}
+function textOnTeam(hex){if(!hex||hex.length<7)return'#fff';const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);return(0.299*r+0.587*g+0.114*b)>150?'#000':'#fff';}
+function flagFor(country,locality){return COUNTRY_FLAGS[country]||COUNTRY_FLAGS[locality]||'🏁';}
+function normalizeTrackKey(value){
+  return String(value||'').toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+}
+
+function resolveTrack(nr){
+  if(!nr||!__trackData.tracks?.length)return null;
+  const cid=normalizeCircuitId(nr.circuit_id,nr.locality,nr.country);
+  const search=new Set([cid,normalizeTrackKey(nr.circuit_id),normalizeTrackKey(nr.circuit),normalizeTrackKey(nr.locality),normalizeTrackKey(nr.short_name),normalizeTrackKey(nr.name)]);
+  return __trackData.tracks.find(t=>t.keys?.some(k=>search.has(k)||search.has(normalizeTrackKey(k))))||null;
+}
+
+function normalizeCircuitId(id,locality,country){
+  if(!id)return 'default';
+  const s=String(id).toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_|_$/g,'');
+  if(CIRCUIT_PATHS[s])return s;
+  const aliases={albert_park:'melbourne',catalunya:'barcelona',red_bull_ring:'spielberg',circuit_de_monaco:'monaco',
+    circuit_gilles_villeneuve:'montreal',marina_bay:'marina_bay',marina_bay_street_circuit:'marina_bay',
+    circuit_of_the_americas:'cota',autodromo_jose_carlos_pace:'interlagos',autódromo_josé_carlos_pace:'interlagos',
+    yas_marina:'bahrain',losail:'jeddah',lusail:'jeddah',sakhir:'bahrain'};
+  if(aliases[s])return aliases[s];
+  const loc=(locality||'').toLowerCase();
+  for(const k of Object.keys(CIRCUIT_PATHS))if(loc.includes(k.replace('_',' '))||loc.includes(k))return k;
+  return Object.keys(CIRCUIT_PATHS)[0];
+}
+function loadConfig(){
+  try{
+    const raw=localStorage.getItem(STORAGE_KEY);
+    if(raw){const cfg=JSON.parse(raw);if(cfg?.driverCode)return cfg;}
+  }catch{}
+  return {...DEFAULT_CFG};
+}
+function saveConfig(cfg){cfg.savedAt=new Date().toISOString();localStorage.setItem(STORAGE_KEY,JSON.stringify(cfg));}
+function applyTheme(cfg){if(cfg&&cfg.teamId)document.documentElement.style.setProperty('--accent',getTeamColor(cfg.teamId));}
+function fmtDate(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});}
+function fmtShort(iso){if(!iso)return'—';const d=new Date(iso);return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});}
+function pad2(n){return String(n).padStart(2,'0');}
+function countdownParts(target){const diff=Math.max(0,target-new Date());return{d:Math.floor(diff/864e5),h:Math.floor(diff/36e5)%24,m:Math.floor(diff/6e4)%60,s:Math.floor(diff/1e3)%60};}
+function safe(v,f='—'){if(v===null||v===undefined||v==='')return f;if(typeof v==='number'&&isNaN(v))return f;return v;}
+
+async function apiFetch(path,opts={}){
+  const timeout=opts.timeout||API_TIMEOUT;
+  const retries=opts.retries??API_RETRIES;
+  let lastErr;
+  for(let a=0;a<=retries;a++){
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),timeout);
+    try{
+      const res=await fetch(API_BASE+path,{signal:ctrl.signal});
+      clearTimeout(timer);
+      if(!res.ok&&res.status!==206)throw new Error('HTTP '+res.status);
+      const data=await res.json();
+      if(data?.error)data._error=true;
+      return data;
+    }catch(e){clearTimeout(timer);lastErr=e;if(a<retries)await new Promise(r=>setTimeout(r,800*(a+1)));}
+  }
+  throw lastErr;
+}
+
+function skeletonRows(n){return Array.from({length:n},()=>'<div class="skeleton-row"></div>').join('');}
+function showSkeleton(el,n=5){if(typeof el==='string')el=document.getElementById(el);if(el)el.innerHTML=skeletonRows(n);}
+function showError(el,msg='Data unavailable'){if(typeof el==='string')el=document.getElementById(el);if(el)el.innerHTML=`<div class="section-error mono">${esc(msg)}</div>`;}
+
+function initSkeletons(){
+  showSkeleton('wLiveTimingBody',8);showSkeleton('wRaceControl',5);showSkeleton('wPitStopsBody',4);
+  showSkeleton('wTyreStrategy',5);showSkeleton('wWeather',4);showSkeleton('wNews',3);showSkeleton('wStandings',5);
+  showSkeleton('driversBody',8);showSkeleton('constructorsBody',6);
+  showSkeleton('paddockBody',4);showSkeleton('qualiBody',8);showSkeleton('spotlightBody',3);
+  const hBody=document.querySelector('#panelStatistics .section-body');
+  if(hBody&&!document.getElementById('historySkeleton')){
+    const sk=document.createElement('div');sk.className='skeleton-chart';sk.id='historySkeleton';
+    hBody.insertBefore(sk,document.getElementById('historyChart'));
+    document.getElementById('historyChart').style.display='none';
+  }
+}
+function hideHistorySkeleton(){
+  const sk=document.getElementById('historySkeleton');
+  if(sk)sk.remove();
+  const c=document.getElementById('historyChart');
+  if(c)c.style.display='block';
+}
+
+
+function wordReveal(el,text,delay){el.innerHTML='';text.split(' ').forEach((w,i)=>{const wrap=document.createElement('span');wrap.className='ob-word';const inner=document.createElement('span');inner.textContent=w;inner.style.animationDelay=(i*0.15+delay)+'s';wrap.appendChild(inner);el.appendChild(wrap);el.appendChild(document.createTextNode(' '));});if(delay===0){const dot=document.createElement('span');dot.className='ob-dot';el.appendChild(dot);}}
+
+function initOnboarding(cfg){
+  wordReveal(document.getElementById('obHeadline1'),'WHAT SHOULD WE CALL YOU',0);
+  wordReveal(document.getElementById('obHeadline2'),'PICK YOUR DRIVER',0);
+  const grid=document.getElementById('driverGrid');
+  grid.innerHTML=DRIVERS_2026.map((d,i)=>`<div class="driver-card" data-code="${d.code}" data-team="${d.team_id}" style="--tc:${getTeamColor(d.team_id)};animation-delay:${i*0.03}s"><span class="wm">${d.number}</span><div class="code mono">${d.code}</div><div class="name f1-display">${d.given_name} ${d.family_name}</div><div class="team mono">${d.team_name}</div><span class="check">✓</span></div>`).join('');
+  const nameInput=document.getElementById('obName');
+  const cont1=document.getElementById('obContinue1');
+  const confirm=document.getElementById('obConfirm');
+  let selCode=cfg?.driverCode||null;
+  if(cfg?.name)nameInput.value=cfg.name;
+  cont1.disabled=!nameInput.value.trim();
+  nameInput.addEventListener('input',()=>{cont1.disabled=!nameInput.value.trim();});
+  cont1.onclick=()=>{if(!nameInput.value.trim())return;document.getElementById('obStep1').classList.remove('active');document.getElementById('obStep2').classList.add('active');};
+  grid.querySelectorAll('.driver-card').forEach(card=>{
+    if(card.dataset.code===selCode)card.classList.add('selected');
+    card.onclick=e=>{
+      grid.querySelectorAll('.driver-card').forEach(c=>c.classList.remove('selected'));
+      card.classList.add('selected');selCode=card.dataset.code;
+      const d=DRIVERS_2026.find(x=>x.code===selCode);
+      document.getElementById('obCallout').textContent=`● ${d.given_name.toUpperCase()} ${d.family_name.toUpperCase()} · ${d.team_name}`;
+      confirm.disabled=false;spawnParticles(e, getTeamColor(d.team_id));
+    };
+  });
+  if(selCode)confirm.disabled=false;
+  confirm.onclick=()=>{
+    if(!selCode)return;const d=DRIVERS_2026.find(x=>x.code===selCode);
+    const newCfg={name:nameInput.value.trim(),driverCode:selCode,teamId:d.team_id};
+    saveConfig(newCfg);finishOnboarding(newCfg);
+  };
+}
+
+function spawnParticles(e,color){
+  const wrap=document.querySelector('.particles')||(()=>{const p=document.createElement('div');p.className='particles';document.body.appendChild(p);return p;})();
+  const rect=e.currentTarget.getBoundingClientRect();const cx=e.clientX||(rect.left+rect.width/2);const cy=e.clientY||(rect.top+rect.height/2);
+  for(let i=0;i<18;i++){const p=document.createElement('div');const ang=Math.random()*Math.PI*2;const dist=30+Math.random()*60;
+    p.style.cssText=`position:fixed;left:${cx}px;top:${cy}px;width:6px;height:6px;background:${color};--tx:${Math.cos(ang)*dist}px;--ty:${Math.sin(ang)*dist}px;animation:particleBurst .6s ease forwards`;wrap.appendChild(p);setTimeout(()=>p.remove(),700);}
+}
+
+function finishOnboarding(cfg){
+  const ob=document.getElementById('onboarding');applyTheme(cfg);
+  ob.classList.add('exit-flash');setTimeout(()=>ob.classList.add('checker-wipe'),300);
+  setTimeout(()=>{ob.style.display='none';document.getElementById('splash').style.display='flex';document.getElementById('dashboard').classList.add('visible');startDashboard(cfg);},1000);
+}
+
+function hideSplash(){const s=document.getElementById('splash');if(s){s.classList.add('out');setTimeout(()=>s.style.display='none',400);}}
+
+function mergeLastRace(standings,lr,quali){
+  const base={...(standings?.last_race||{}),...(lr||{})};
+  if(quali)base.qualifying=quali;
+  if(lr?.results?.length){base.results=lr.results;base.podium=lr.results.filter(r=>r.position<=3);}
+  if(lr?.race_control)base.race_control=lr.race_control;
+  return base;
+}
+
+function renderWave1(cfg){
+  paintHeader(cfg,__latestData);applyTheme(cfg);
+  const d=__latestData;
+  if(d.drivers?.length){renderFooterTicker(d,__liveData);renderDrivers(d,cfg);renderConstructors(d);renderStandingsWidget(d,cfg);}
+  if(d.next_race||d.schedule){renderNextSession(d);renderCircuitInfo(d);renderCalendar(d);}
+  updateTopbarLive(__liveData,d);
+  renderLiveTimingTable(__liveData,d,cfg);
+  renderTrackMap(d,__liveData,cfg);
+}
+
+function renderWave2(cfg){
+  const d=__latestData;
+  d.last_race=mergeLastRace(d,__lastRaceData,__qualiData);
+  renderWeather(__weatherData);
+  renderRaceControl(d,__liveData);
+  renderPitStops(d);
+  renderGapChart(d,__liveData);
+  renderNews(d);
+  renderSpotlight(d,cfg,__driverData);
+  renderPaddock(d);
+  setupCountdowns(d);
+  renderNext3(d);
+  if(__firstRender){__firstRender=false;populateTelemetrySelects(cfg);}
+}
+
+function renderWave3(cfg,loadTel=true,resetHistAnim=false){
+  renderTireStrategy(__tireData);
+  renderQualifying({...__latestData,last_race:{...(__latestData.last_race||{}),qualifying:__qualiData}});
+  if(__historyData?.history?.length){hideHistorySkeleton();if(resetHistAnim)__historyDrawn=false;renderHistoryChart(__historyData,cfg);}
+  if(loadTel)fetchTelemetry(cfg?.driverCode||'NOR');
+}
+
+async function fetchAndRender(cfg,isPoll=false){
+  if(!isPoll)renderWave1(cfg);
+  const roundQ=__selectedRound?`?round=${__selectedRound}`:'';
+  const t0=performance.now();
+
+  const wave1=await Promise.allSettled([
+    apiFetch('/api/standings',{timeout:15000}),
+    apiFetch('/api/live',{timeout:8000}).catch(()=>({live:false})),
+    apiFetch('/api/tracks',{timeout:20000}).catch(()=>({configured:false,tracks:[]}))
+  ]);
+  if(wave1[0].status==='fulfilled'){
+    __latestData={...__latestData,...wave1[0].value};
+    __apiLatency=Math.round(performance.now()-t0);
+    renderWave1(cfg);
+  }else if(!isPoll){showError('driversBody','Standings unavailable');showError('constructorsBody','Standings unavailable');}
+  if(wave1[2].status==='fulfilled')__trackData=wave1[2].value;
+  if(wave1[1].status==='fulfilled'){__liveData=wave1[1].value;updateTopbarLive(__liveData,__latestData);renderLiveTimingTable(__liveData,__latestData,cfg);renderGapChart(__latestData,__liveData);renderRaceControl(__latestData,__liveData);renderFooterTicker(__latestData,__liveData);}
+  if(__trackData.tracks?.length||__latestData.next_race){renderTrackMap(__latestData,__liveData,cfg);}
+
+  const wave2=await Promise.allSettled([
+    apiFetch('/api/last-race',{timeout:45000}),
+    apiFetch(`/api/qualifying${roundQ}`,{timeout:45000}),
+    apiFetch('/api/weather',{timeout:15000}),
+    cfg?.driverCode?apiFetch(`/api/driver/${cfg.driverCode}`,{timeout:20000}):Promise.resolve(null)
+  ]);
+  if(wave2[0].status==='fulfilled')__lastRaceData=wave2[0].value;else if(!isPoll)showError('paddockBody','Race data unavailable');
+  if(wave2[1].status==='fulfilled')__qualiData=wave2[1].value;else if(!isPoll)showError('qualiBody','Qualifying unavailable');
+  if(wave2[2].status==='fulfilled')__weatherData=wave2[2].value;else if(!isPoll)showError('wWeather','Weather unavailable');
+  if(wave2[3].status==='fulfilled')__driverData=wave2[3].value;
+  renderWave2(cfg);
+
+  Promise.allSettled([
+    apiFetch('/api/tire-strategy',{timeout:45000}),
+    apiFetch('/api/championship-history',{timeout:20000})
+  ]).then(([tireRes,histRes])=>{
+    if(tireRes.status==='fulfilled')__tireData=tireRes.value;else if(!isPoll)showError('wTyreStrategy','Strategy unavailable');
+    if(histRes.status==='fulfilled'){__historyData=histRes.value;}
+    else if(!isPoll){hideHistorySkeleton();const hb=document.querySelector('#panelStatistics .section-body');
+      if(hb&&!document.getElementById('historyChart'))hb.innerHTML='<div class="section-error mono">Championship history unavailable</div>';}
+    renderWave3(cfg,!isPoll,!isPoll);
+    if(tireRes.status==='fulfilled')renderPitStops(__latestData);
+  });
+}
+
+function paintHeader(cfg,data){
+  const name=cfg?.name||'Fan';
+  document.getElementById('topbarUserName').textContent=name;
+  const drv=DRIVERS_2026.find(x=>x.code===cfg?.driverCode);
+  const tc=getTeamColor(cfg?.teamId);
+  document.getElementById('topbarTeamFan').textContent=drv?`${drv.team_name} · ${drv.code} fan`:'—';
+  document.getElementById('sidebarTeamName').textContent=drv?.team_name||'—';
+  document.getElementById('sidebarDriverName').textContent=drv?`${drv.given_name} ${drv.family_name}`:'—';
+  document.getElementById('sidebarTeamDot').style.background=tc;
+  document.getElementById('sidebarDriverDot').style.background=tc;
+  const nr=data?.next_race;const live=__liveData;
+  if(live?.live){
+    const s=live.session||{};
+    document.getElementById('topbarRaceName').textContent=s.name||s.type||nr?.short_name||'LIVE SESSION';
+  }else if(nr){
+    document.getElementById('topbarRaceName').textContent=nr.short_name||nr.name||'F1 2026';
+  }
+}
+
+function updateTopbarLive(live,data){
+  const pill=document.getElementById('topbarLiveBadge');
+  const txt=document.getElementById('topbarLiveText');
+  if(live?.live){
+    pill.classList.remove('off');
+    const s=live.session||{};
+    txt.textContent='LIVE · '+(s.type||'SESSION');
+    const lap=live.race_control?.slice(-1)[0]?.lap||live.current_lap||'—';
+    const total=(data?.next_race&&CIRCUIT_META[normalizeCircuitId(data.next_race.circuit_id,data.next_race.locality,data.next_race.country)]?.laps)||'—';
+    document.getElementById('topbarLapCounter').textContent=`LAP ${lap}/${total}`;
+  }else{
+    pill.classList.add('off');
+    txt.textContent='OFFLINE';
+    document.getElementById('topbarLapCounter').textContent='LAP —/—';
+  }
+  if(__weatherData){
+    document.getElementById('topbarAir').textContent=safe(__weatherData.air_temp,'—');
+    document.getElementById('topbarTrack').textContent=safe(__weatherData.track_temp,'—');
+    document.getElementById('topbarHumidity').textContent=safe(__weatherData.humidity,'—');
+    document.getElementById('topbarWind').textContent=safe(__weatherData.wind_speed,'—');
+  }
+  document.getElementById('topbarLatency').textContent=__apiLatency!=null?`${__apiLatency} ms`:'— ms';
+}
+
+function renderFooterTicker(data,live){
+  const parts=[];
+  if(live?.live&&live.grid?.length){
+    live.grid.forEach((r,i)=>{
+      if(i===0)return;
+      const prev=live.grid[i-1];
+      parts.push(`${r.driver_code} +${esc(r.gap_to_leader||r.interval||'—')} to ${prev.driver_code}`);
+    });
+  }else{
+    const lr=data?.last_race;const results=lr?.results||lr?.podium||[];
+    results.slice(1,8).forEach(r=>{
+      const leader=results[0];
+      parts.push(`${r.abbreviation||r.full_name} +${esc(r.gap||r.time||'—')} to ${leader?.abbreviation||leader?.full_name||'P1'}`);
+    });
+    if(!parts.length){
+      const d=data.drivers||[];const c=data.constructors||[];const nr=data.next_race;const wdc=d[0]||{};const wcc=c[0]||{};
+      parts.push(`WDC · ${wdc.given_name||''} ${wdc.family_name||wdc.code||'—'} · ${wdc.pts||0} pts`);
+      parts.push(`WCC · ${wcc.name||'—'} · ${wcc.pts||0} pts`);
+      parts.push(`NEXT · ${nr?.short_name||'—'} · ${fmtShort(nr?.start_utc)}`);
+    }
+  }
+  const txt=parts.map(p=>`<span>◆ ${p}</span>`).join('');
+  document.getElementById('footerTicker').innerHTML=txt+txt;
+}
+
+function renderNextSession(data){
+  const nr=data.next_race;if(!nr)return;
+  document.getElementById('wNextSessionLabel').textContent=nr.status==='live'?'SESSION LIVE':'LIGHTS OUT IN';
+  __nextRaceTarget=nr.start_utc?new Date(nr.start_utc):null;
+}
+
+function renderCircuitInfo(data){
+  const nr=data.next_race;if(!nr)return;
+  const cid=normalizeCircuitId(nr.circuit_id,nr.locality,nr.country);
+  const meta=CIRCUIT_META[cid]||{laps:'—',length:'—',record:'—',recordHolder:'—',pole2025:'—',dates:'—'};
+  document.getElementById('circuitPhoto').textContent=flagFor(nr.country,nr.locality);
+  document.getElementById('nrRound').textContent=`◆ ROUND ${String(nr.round).padStart(2,'0')}`;
+  document.getElementById('nrName').textContent=nr.name||nr.short_name;
+  document.getElementById('nrCircuit').textContent=`${nr.circuit||''} · ${nr.locality||''}, ${nr.country||''}`;
+  document.getElementById('nrStats').innerHTML=`
+    <div><label>LAP RECORD</label><val>${esc(meta.record)}</val></div>
+    <div><label>POLE 2025</label><val>${esc(meta.pole2025)}</val></div>
+    <div><label>LAPS</label><val>${meta.laps}</val></div>
+    <div><label>LENGTH</label><val>${meta.length} km</val></div>
+    <div><label>DATES</label><val>${meta.dates}</val></div>
+    <div><label>START</label><val>${fmtShort(nr.start_utc)}</val></div>`;
+}
+
+let __nextRaceTarget=null;
+function setupCountdowns(data){
+  if(__countdownTimer)clearInterval(__countdownTimer);
+  const targets=[__nextRaceTarget];
+  const upcoming=(data.schedule||[]).filter(s=>s.status==='upcoming').slice(0,3);
+  __countdownTimer=setInterval(()=>{
+    if(__nextRaceTarget){const c=countdownParts(__nextRaceTarget);
+      document.getElementById('cdD').textContent=pad2(c.d);document.getElementById('cdH').textContent=pad2(c.h);
+      document.getElementById('cdM').textContent=pad2(c.m);document.getElementById('cdS').textContent=pad2(c.s);}
+    document.querySelectorAll('[data-countdown]').forEach((el,i)=>{
+      const t=el.dataset.target;if(!t)return;const c=countdownParts(new Date(t));
+      el.textContent=`${c.d}d ${pad2(c.h)}h ${pad2(c.m)}m ${pad2(c.s)}s`;
+    });
+  },1000);
+}
+
+function renderCalendar(data){
+  const sched=data.schedule||[];const done=sched.filter(s=>s.status==='done').length;
+  document.getElementById('calProgress').style.width=(done/Math.max(sched.length,1)*100)+'%';
+  const lr=data.last_race;
+  document.getElementById('calStrip').innerHTML=sched.map(s=>{
+    const cls=['cal-card',s.status];if(data.next_race&&s.round===data.next_race.round)cls.push('next');
+    const winner=s.status==='done'&&lr?.round===s.round&&lr.podium?.[0]?`<div class="cal-winner">★ ${esc(lr.podium[0].full_name||lr.podium[0].abbreviation||'')}</div>`:'';
+    return `<div class="${cls.join(' ')}" data-round="${s.round}" data-done="${s.status==='done'}">
+      <div class="cal-round mono">R${s.round}${s.status==='upcoming'&&data.next_race?.round===s.round?' <span class="cal-dot"></span>':''}</div>
+      <div class="cal-flag">${flagFor(s.country,s.locality)}</div>
+      <div class="cal-country mono">${esc(s.country)}</div>
+      <div class="cal-city">${esc(s.short_name||s.locality)}</div>
+      <div class="cal-date mono">${fmtShort(s.start_utc)}</div>${winner}</div>`;
+  }).join('');
+  document.getElementById('calStrip').querySelectorAll('.cal-card[data-done="true"]').forEach(card=>{
+    card.onclick=async()=>{__selectedRound=+card.dataset.round;
+      const quali=await apiFetch(`/api/qualifying?round=${__selectedRound}`);
+      const lr=await apiFetch('/api/last-race');
+      __latestData.last_race={...__latestData.last_race,...lr,qualifying:quali,round:__selectedRound};
+      renderPaddock(__latestData);renderQualifying(__latestData);};
+  });
+}
+
+function renderStandingsWidget(data,cfg){
+  const el=document.getElementById('wStandings');
+  if(__standingsTab==='constructors'){
+    const teams=(data.constructors||[]).slice(0,5);
+    el.innerHTML=`<table class="data-table"><thead><tr><th>POS</th><th>TEAM</th><th>PTS</th></tr></thead><tbody>
+      ${teams.map((t,i)=>{const tc=getTeamColor(t.id);
+        return `<tr class="drv-row" style="--tc:${tc};animation-delay:${i*0.05}s"><td class="pos">${t.pos}</td><td>${esc(t.name)}</td><td class="pts-big">${t.pts||0}</td></tr>`;}).join('')}
+    </tbody></table>`;
+  }else{
+    const drivers=(data.drivers||[]).slice(0,5);
+    el.innerHTML=`<table class="data-table"><thead><tr><th>POS</th><th>DRIVER</th><th>PTS</th></tr></thead><tbody>
+      ${drivers.map((d,i)=>{const tc=getTeamColor(d.team_id);const isUser=cfg?.driverCode===d.code;
+        return `<tr class="drv-row ${d.pos===1?'leader':''} ${isUser?'user-row':''}" style="--tc:${tc};animation-delay:${i*0.05}s">
+          <td class="pos">${d.pos}</td><td><span class="code-badge" style="background:${tc};color:${textOnTeam(tc)}">${d.code}</span> ${esc(d.family_name)}</td>
+          <td class="pts-big">${d.pts||0}</td></tr>`;}).join('')}
+    </tbody></table>`;
+  }
+}
+
+function renderLiveTimingTable(live,data,cfg){
+  const body=document.getElementById('wLiveTimingBody');
+  if(live?.live&&live.grid?.length){
+    body.innerHTML=live.grid.map((r,i)=>{const tc=r.team_color||getTeamColor(r.team);
+      const drv=DRIVERS_2026.find(d=>d.code===r.driver_code);
+      const compound=r.compound||r.tyre||'S';const col=COMPOUND_COLORS[compound]||COMPOUND_COLORS.SOFT;
+      return `<tr class="${r.pos===1?'leader':''} ${cfg?.driverCode===r.driver_code?'user-row':''}" style="--tc:${tc}">
+        <td class="pos mono">${r.pos}</td>
+        <td><span class="code" style="color:${tc}">${r.driver_code}</span> <span style="font-size:10px;color:var(--f1-text-2)">${esc(r.short_name||drv?.family_name||'')}</span></td>
+        <td class="mono">${esc(r.gap_to_leader||(r.pos===1?'LEADER':''))}</td>
+        <td class="mono">${esc(r.interval||'—')}</td>
+        <td><span class="comp-dot" style="background:${col}">${compound[0]||'S'}</span></td>
+        <td class="mono">${esc(r.last_lap||'—')}</td>
+        <td class="mono">${esc(r.sector1||'—')}</td>
+        <td class="mono">${esc(r.sector2||'—')}</td>
+        <td class="mono">${esc(r.sector3||'—')}</td></tr>`;}).join('');
+    document.getElementById('liveGrid').innerHTML=live.grid.map(r=>{const tc=r.team_color||getTeamColor(r.team);
+      return `<div class="live-row mono" style="--tc:${tc};display:grid;grid-template-columns:32px 48px 1fr 80px;padding:6px 0;border-bottom:1px solid var(--f1-border);border-left:4px solid ${tc}">
+        <span>${r.pos}</span><span style="color:${tc}">${r.driver_code}</span><span>${esc(r.short_name)}</span><span>${esc(r.gap_to_leader||'')}</span></div>`;}).join('');
+    document.getElementById('liveRcLog').innerHTML=(live.race_control||[]).map(m=>`<div class="rc-item flag-${(m.flag||'green').toLowerCase()} mono">${esc(m.message)}</div>`).join('');
+    return;
+  }
+  const results=(data?.last_race?.results||data?.last_race?.podium||[]).slice(0,10);
+  if(!results.length){body.innerHTML='<tr><td colspan="9" class="mono" style="color:var(--f1-text-2);padding:12px">No timing data — waiting for live session</td></tr>';return;}
+  body.innerHTML=results.map((r,i)=>{const tc=getTeamColor(r.team_id);
+    return `<tr class="${r.position===1?'leader':''}" style="--tc:${tc}">
+      <td class="pos mono">${r.position}</td>
+      <td><span class="code" style="color:${tc}">${r.abbreviation||''}</span> <span style="font-size:10px">${esc(r.full_name||'')}</span></td>
+      <td class="mono">${r.position===1?'LEADER':esc(r.gap||r.time||'—')}</td>
+      <td class="mono">—</td><td><span class="comp-dot" style="background:var(--medium)">M</span></td>
+      <td class="mono">${esc(r.time||'—')}</td><td class="mono">—</td><td class="mono">—</td><td class="mono">—</td></tr>`;}).join('');
+}
+
+function renderTrackMap(data,live,cfg){
+  const nr=data?.next_race||{};
+  const img=document.getElementById('wTrackMapImg');
+  const svg=document.getElementById('wTrackMapSvg');
+  const track=resolveTrack(nr);
+  if(track?.image_path){
+    img.src=track.image_path;
+    img.alt=track.name||nr.short_name||'Track';
+    img.classList.remove('hidden');
+    svg.classList.add('hidden');
+    return;
+  }
+  img.classList.add('hidden');
+  img.removeAttribute('src');
+  svg.classList.remove('hidden');
+  const cid=normalizeCircuitId(nr.circuit_id,nr.locality,nr.country);
+  const path=CIRCUIT_PATHS[cid]||Object.values(CIRCUIT_PATHS)[0];
+  const drivers=live?.live&&live.grid?.length?live.grid.map(r=>({code:r.driver_code,team:r.team,pos:r.pos||0})):
+    (data?.drivers||[]).slice(0,10).map((d,i)=>({code:d.code,team:d.team_id,pos:i+1}));
+  const dots=drivers.map((d,i)=>{
+    const tc=getTeamColor(d.team);const t=(i/drivers.length)*0.85+0.05;
+    const pt=pointOnPath(path,t);const isUser=cfg?.driverCode===d.code;
+    return `<circle cx="${pt.x}" cy="${pt.y}" r="${isUser?5:4}" fill="${tc}" stroke="${isUser?'#d4a017':'#151515'}" stroke-width="${isUser?2:1}"><title>${d.code}</title></circle>`;
+  }).join('');
+  svg.innerHTML=`
+    <rect width="400" height="280" fill="#151515"/>
+    <path d="${path}" fill="none" stroke="#38383f" stroke-width="3" transform="translate(20,20) scale(1.1)"/>
+    <path d="${path}" fill="none" stroke="#3671C6" stroke-width="10" stroke-linecap="round" opacity="0.4" transform="translate(20,20) scale(1.1)" class="drs-zone" stroke-dasharray="30 120 40 200"/>
+    <g transform="translate(20,20) scale(1.1)">${dots}</g>
+    <text x="30" y="265" fill="#666" font-family="F1 Regular,sans-serif" font-size="9">${esc(nr.short_name||cid)}</text>`;
+}
+
+function pointOnPath(pathD,t){
+  const doc=new DOMParser().parseFromString(`<svg xmlns="http://www.w3.org/2000/svg"><path d="${pathD}"/></svg>`,'image/svg+xml');
+  const p=doc.querySelector('path');
+  const len=p.getTotalLength();const pt=p.getPointAtLength(len*t);
+  return{x:pt.x,y:pt.y};
+}
+
+function renderRaceControl(data,live){
+  const rc=live?.live?(live.race_control||[]):(data?.last_race?.race_control||[]);
+  const el=document.getElementById('wRaceControl');
+  if(!rc.length){el.innerHTML='<div class="mono" style="color:var(--f1-text-2);font-size:11px">No race control messages</div>';return;}
+  el.innerHTML=rc.slice(-20).reverse().map(m=>`<div class="rc-item flag-${(m.flag||'green').toLowerCase()} mono">${m.lap?'L'+m.lap+' · ':''}${esc(m.message)}</div>`).join('');
+}
+
+function renderPitStops(data){
+  const el=document.getElementById('wPitStopsBody');
+  const stops=[];
+  (__tireData?.drivers||[]).forEach(dr=>{
+    if(dr.stints?.length>1)dr.stints.slice(1).forEach(s=>stops.push({driver:dr.driver,lap:s.lap_start,compound:s.compound}));
+  });
+  if(!stops.length){
+    const lr=data?.last_race?.pit_stops||[];
+    lr.forEach(p=>stops.push({driver:p.driver||p.abbreviation,lap:p.lap,compound:p.compound||'—'}));
+  }
+  stops.sort((a,b)=>a.lap-b.lap);
+  if(!stops.length){el.innerHTML='<div class="mono" style="color:var(--f1-text-2);font-size:11px">No pit stop data</div>';return;}
+  el.innerHTML=stops.slice(0,12).map(s=>{const drv=DRIVERS_2026.find(d=>d.code===s.driver);const tc=getTeamColor(drv?.team_id);
+    const col=COMPOUND_COLORS[s.compound]||'#888';
+    return `<div class="pit-item"><span class="code mono" style="color:${tc}">${s.driver}</span><span class="mono">L${s.lap}</span><span class="comp-dot" style="background:${col}">${(s.compound||'?')[0]}</span></div>`;}).join('');
+}
+
+function renderGapChart(data,live){
+  const c=document.getElementById('wGapChartCanvas');if(!c)return;
+  const ctx=c.getContext('2d');const w=c.width=c.clientWidth,h=c.height;
+  if(live?.live&&live.grid?.length){
+    live.grid.slice(0,5).forEach(r=>{
+      if(!__gapHistory[r.driver_code])__gapHistory[r.driver_code]=[];
+      const g=parseFloat(String(r.gap_to_leader||'0').replace('+',''))||0;
+      __gapHistory[r.driver_code].push(g);
+      if(__gapHistory[r.driver_code].length>40)__gapHistory[r.driver_code].shift();
+    });
+  }else if(__historyData?.history?.length){
+    const top=__historyData.history[__historyData.history.length-1]?.drivers?.slice(0,3)||[];
+    top.forEach(d=>{
+      if(!__gapHistory[d.code])__gapHistory[d.code]=[];
+      __gapHistory[d.code]=__historyData.history.map(r=>(r.drivers.find(x=>x.code===d.code)||{points:0}).points);
+    });
+  }
+  ctx.fillStyle='#151515';ctx.fillRect(0,0,w,h);
+  const codes=Object.keys(__gapHistory).slice(0,5);
+  if(!codes.length){ctx.fillStyle='#888';ctx.font='11px F1 Regular,sans-serif';ctx.textAlign='center';ctx.fillText('Gap history builds during live sessions',w/2,h/2);ctx.textAlign='left';return;}
+  const allVals=codes.flatMap(c=>__gapHistory[c]);const maxV=Math.max(...allVals,1)||1;
+  codes.forEach(code=>{
+    const pts=__gapHistory[code];const drv=DRIVERS_2026.find(d=>d.code===code);const col=getTeamColor(drv?.team_id);
+    ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.beginPath();
+    pts.forEach((v,i)=>{const x=10+(i/(pts.length-1||1))*(w-20);const y=h-10-(v/maxV)*(h-24);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.stroke();
+    ctx.fillStyle=col;ctx.font='9px F1 Regular,sans-serif';ctx.fillText(code,w-40,codes.indexOf(code)*12+14);
+  });
+}
+
+function renderDrivers(data,cfg){
+  const drivers=(data.drivers||[]).slice(0,10);
+  const rounds=(data.schedule||[]).filter(s=>s.status==='done').length;
+  document.getElementById('driversSub').textContent=`§ 01 · ${rounds} rounds in · top 10 shown`;
+  document.getElementById('driversBody').innerHTML=`<table class="data-table"><thead><tr><th>POS</th><th>DRIVER</th><th>TEAM</th><th>NAT</th><th>WINS</th><th>PTS</th><th>GAP</th></tr></thead><tbody>
+    ${drivers.map((d,i)=>{const tc=getTeamColor(d.team_id);const isUser=cfg?.driverCode===d.code;const gap=d.gap===0?'—':d.gap;
+      return `<tr class="drv-row ${d.pos===1?'leader':''} ${isUser?'user-row':''}" style="--tc:${tc};animation-delay:${i*0.05}s">
+        <td class="pos">${d.pos}</td><td><span class="f1-display" style="font-size:15px">${esc(d.given_name)} ${esc(d.family_name)}</span>
+        <span class="code-badge" style="background:${tc};color:${textOnTeam(tc)}">${d.code}</span></td>
+        <td>${esc(d.team_name)}</td><td class="mono">${d.nationality||''}</td><td class="mono">${d.wins||0}</td>
+        <td class="pts-big">${d.pts||0}</td><td class="mono ${gap==='—'?'gap-lead':''}">${gap}</td></tr>`;}).join('')}
+  </tbody></table>`;
+}
+
+function renderConstructors(data){
+  const teams=data.constructors||[];
+  document.getElementById('constructorsBody').innerHTML=`<table class="data-table"><thead><tr><th>POS</th><th>TEAM</th><th>NAT</th><th>WINS</th><th>PTS</th></tr></thead><tbody>
+    ${teams.slice(0,10).map((t,i)=>{const tc=getTeamColor(t.id);const h=TEAM_HERITAGE[t.id]||{titles:0,since:'—',last:'—'};
+      return `<tr class="drv-row" style="--tc:${tc};animation-delay:${i*0.05}s"><td class="pos">${t.pos}</td><td>
+        <div class="f1-display" style="font-size:15px">${esc(t.name)}</div>
+        <div class="con-bar"><div class="con-bar-fill" style="width:${t.pct||0}%;background:${tc}"></div></div>
+        <div class="con-heritage mono">× ${h.titles} titles · since ${h.since} · last ${h.last||'—'}</div></td>
+        <td class="mono">${t.nationality||''}</td><td class="mono">${t.wins||0}</td><td class="pts-big">${t.pts||0}</td></tr>`;}).join('')}
+  </tbody></table>`;
+}
+
+
+function renderPaddock(data){
+  const lr=data.last_race||{};const results=lr.results||lr.podium||[];
+  const fullResults=lr.results||(lr.podium||[]);
+  const podium=(lr.podium||fullResults.filter(r=>r.position<=3)).slice(0,3);
+  const medals=['gold','silver','bronze'];
+  const podiumHtml=podium.map((p,i)=>`<div class="podium-col ${i===0?'p1':''}"><div class="podium-pos" style="color:${getTeamColor(p.team_id)}">${p.position||(i+1)}</div>
+    <div class="podium-name">${esc(p.full_name||p.abbreviation||'')}</div><div class="podium-team mono">${esc(p.team_name||'')}</div>
+    <div class="podium-time">${esc(p.time||p.status||'')}</div></div>`).join('')||'<p class="mono">No podium data</p>';
+  const flDriver=lr.fastest_lap?.driver;
+  const rows=(fullResults.length?fullResults:[]).map(r=>{
+    const dnf=/dnf|retired|disqualified/i.test(r.status||'')?' dnf':'';
+    const fl=r.fastest_lap||r.abbreviation===flDriver?' <span class="fl-dot">◆</span>':'';
+    return `<tr class="race-row"><td class="mono">${r.position}</td><td class="mono">${r.driver_number||''}</td>
+      <td>${esc(r.full_name||r.abbreviation)}${fl}</td><td>${esc(r.team_name)}</td><td class="mono">${r.laps||'—'}</td>
+      <td class="mono${dnf}">${esc(r.time||r.status)}</td><td class="mono">${r.points||0}</td></tr>`;}).join('');
+  const sc=lr.safety_car||[];const maxLap=Math.max(...(fullResults.map(r=>r.laps)||[50]),50);
+  const scMarks=sc.map(m=>{const pct=(m.lap/maxLap*100);return `<div class="sc-mark ${m.type==='VSC'?'vsc':'sc'}" style="left:${pct}%"></div>
+    <div class="sc-label mono" style="left:${pct}%">${m.type} L${m.lap}</div>`;}).join('');
+  const rc=(lr.race_control||[]).map(m=>`<div class="rc-item flag-${m.flag.toLowerCase()} mono">L${m.lap} · ${esc(m.message)}</div>`).join('');
+  document.getElementById('paddockBody').innerHTML=`
+    <div class="podium">${podiumHtml}</div>
+    <table class="data-table"><thead><tr><th>POS</th><th>NO</th><th>DRIVER</th><th>TEAM</th><th>LAPS</th><th>TIME</th><th>PTS</th></tr></thead><tbody>${rows||'<tr><td colspan="7">No results</td></tr>'}</tbody></table>
+    <div class="sc-timeline">${scMarks}</div><div class="rc-log">${rc||'<div class="mono">No race control messages</div>'}</div>
+    <div class="news-grid-full" id="newsGridFull"></div>`;
+  renderNews(data);
+  document.getElementById('newsGridFull').innerHTML=document.getElementById('wNews').innerHTML;
+}
+
+function renderNews(data){
+  const d=data.drivers||[];const c=data.constructors||[];const lr=data.last_race||{};
+  const w=d[0],w2=d[1],wc=c[0],wc2=c[1];const winner=(lr.podium||[])[0];const fl=lr.fastest_lap;
+  const cards=[
+    {k:'WINNER',kColor:'var(--f1-red)',head:winner?`${winner.full_name||winner.abbreviation} takes victory`:'Race winner',body:`${lr.short_name||'Last race'} — ${winner?.team_name||''}`},
+    {k:'FASTEST LAP',kColor:'#a855f7',head:fl?.time||'—',body:`${fl?.driver||'—'} · ${lr.short_name||''}`},
+    {k:'WDC GAP',kColor:'var(--gold)',head:w&&w2?`${Math.abs(w2.gap||0)} pts`:'—',body:`${w?.family_name||''} over ${w2?.family_name||''}`},
+    {k:'WCC GAP',kColor:getTeamColor(wc?.id),head:wc&&wc2?`${Math.round((wc.pts||0)-(wc2?.pts||0))} pts`:'—',body:`${wc?.name||''} over ${wc2?.name||''}`}
+  ];
+  document.getElementById('wNews').innerHTML=cards.map(c=>`<div class="news-card"><span class="news-kicker" style="background:${c.kColor};color:#000">${c.k}</span>
+    <div class="news-head">${esc(c.head)}</div><div class="news-body">${esc(c.body)}</div></div>`).join('');
+}
+
+function renderTireStrategy(tire){
+  const drivers=tire?.drivers||[];
+  const letter={SOFT:'S',MEDIUM:'M',HARD:'H',INTERMEDIATE:'I',WET:'W',UNKNOWN:'?'};
+  document.getElementById('wTyreStrategy').innerHTML=drivers.map(dr=>{
+    const drv=DRIVERS_2026.find(d=>d.code===dr.driver)||{team_id:'',code:dr.driver};
+    const tc=getTeamColor(drv.team_id);const total=dr.stints.reduce((a,s)=>a+s.laps,0)||1;
+    const segs=dr.stints.map(s=>{const col=COMPOUND_COLORS[s.compound]||'#888';const w=(s.laps/total*100);
+      return `<div class="tire-seg" style="flex:${s.laps};background:${col}" title="${s.compound} · Laps ${s.lap_start}–${s.lap_end} (${s.laps} laps)">${w>8?letter[s.compound]||'':''}</div>`;}).join('');
+    return `<div class="tire-row"><span class="tire-code mono" style="color:${tc}">${dr.driver}</span><div class="tire-track">${segs}</div></div>`;
+  }).join('')+`<div class="tire-legend mono"><span><span class="tire-swatch" style="background:var(--soft)"></span>SOFT</span>
+    <span><span class="tire-swatch" style="background:var(--medium)"></span>MEDIUM</span>
+    <span><span class="tire-swatch" style="background:var(--hard)"></span>HARD</span>
+    <span><span class="tire-swatch" style="background:var(--inter)"></span>INTERS</span>
+    <span><span class="tire-swatch" style="background:var(--wet)"></span>WET</span></div>`;
+}
+
+function renderQualifying(data){
+  const q=data.last_race?.qualifying?.grid||data.qualifying?.grid||[];
+  document.getElementById('qualiBody').innerHTML=`<table class="data-table"><thead><tr><th>POS</th><th></th><th>DRIVER</th><th class="qual-q1">Q1</th><th class="qual-q2">Q2</th><th>Q3</th><th>GAP</th></tr></thead><tbody>
+    ${q.map((g,i)=>{const tc=getTeamColor(g.team_id);let cls='qual-row';if(!g.q2)cls+=' q1-out';else if(!g.q3)cls+=' q2-out';if(g.position===1)cls+=' pole';
+      return `<tr class="${cls}" style="border-left:4px solid ${g.position===1?'var(--f1-red)':tc}"><td class="mono">${g.position}</td><td><div class="qual-stripe" style="background:${tc}"></div></td>
+        <td>${esc(g.full_name||g.driver)}</td><td class="mono qual-q1">${g.q1||'—'}</td><td class="mono qual-q2">${g.q2||'—'}</td>
+        <td class="mono">${g.q3||'—'}</td><td class="mono" style="${g.gap==='POLE'?'color:var(--f1-red)':''}">${g.gap||'—'}</td></tr>`;}).join('')}
+  </tbody></table>`;
+}
+
+function renderWeather(w){
+  const el=document.getElementById('wWeather');
+  const src=document.getElementById('weatherSource');
+  if(!w||w.error){
+    el.innerHTML='<div class="mono" style="color:var(--f1-text-2);padding:8px">Weather data unavailable.</div>';
+    src.textContent='';
+    return;
+  }
+  const hasData=[w.air_temp,w.track_temp,w.humidity,w.wind_speed].some(v=>v!=null&&v!=='');
+  if(!hasData){
+    el.innerHTML='<div class="mono" style="color:var(--f1-text-2);padding:8px">Weather data unavailable for this session.</div>';
+    src.textContent='';
+    return;
+  }
+  const cards=[
+    {l:'AIR',v:w.air_temp??'—',u:'°C'},{l:'TRACK',v:w.track_temp??'—',u:'°C'},
+    {l:'HUMIDITY',v:w.humidity??'—',u:'%'},{l:'WIND',v:w.wind_speed??'—',u:'km/h',dir:w.wind_direction}
+  ];
+  el.innerHTML=cards.map(c=>{
+    const arrow=c.dir!=null?`<span class="wind-arrow" style="transform:rotate(${c.dir}deg);font-size:14px">↑</span>`:'';
+    return `<div class="wc"><div class="lbl mono">${c.l}</div><div class="val">${c.v}${arrow}</div><div class="unit mono" style="font-size:9px;color:var(--f1-text-2)">${c.u}</div></div>`;}).join('');
+  const source=(w.source||'fastf1').toUpperCase();
+  src.textContent=`Source: ${source} · ${w.session_name||'Session'}`;
+  document.getElementById('topbarAir').textContent=safe(w.air_temp,'—');
+  document.getElementById('topbarTrack').textContent=safe(w.track_temp,'—');
+  document.getElementById('topbarHumidity').textContent=safe(w.humidity,'—');
+  document.getElementById('topbarWind').textContent=safe(w.wind_speed,'—');
+}
+
+function renderSpotlight(data,cfg,drv){
+  const code=cfg?.driverCode;const d=DRIVERS_2026.find(x=>x.code===code)||DRIVERS_2026[0];
+  const standing=(data.drivers||[]).find(x=>x.code===code);
+  const season=drv?.season||{};const career=drv?.career||{};const last5=drv?.last_5||[];
+  const tc=getTeamColor(d.team_id);
+  const pills=last5.map(r=>{let cls='p11';if(r.pos===1)cls='p1';else if(r.pos===2)cls='p2';else if(r.pos===3)cls='p3';else if(r.pos<=10)cls='p4-10';
+    if(/dnf|retired/i.test(r.status))cls='dnf';
+    return `<div class="result-pill"><div class="pill ${cls} mono">P${r.pos}</div><div class="pill-race">${esc(r.short_name||'R'+r.round)}</div></div>`;}).join('');
+  document.getElementById('spotlightBody').innerHTML=`
+    <div class="spotlight-wm" style="color:${tc}">${d.number}</div>
+    <div><span class="spot-code mono" style="background:${tc};color:${textOnTeam(tc)}">${d.code}</span>
+      <div class="spot-name f1-display"><span>${d.given_name}</span> <strong><em>${d.family_name}</em></strong></div>
+      <div class="spot-meta mono">${d.team_name} · ${d.nationality}</div>
+      <div class="spot-grid">${[['STANDING','P'+(standing?.pos||season.standing||'—')],['SEASON WINS',standing?.wins||season.wins||0],['POINTS',standing?.pts||season.points||0],['LAPS LED',season.laps_led||0]].map(s=>`<div class="spot-stat"><div class="lbl mono">${s[0]}</div><div class="val">${s[1]}</div></div>`).join('')}</div>
+      <div class="spot-grid">${[['TOTAL WINS',career.wins||0],['TOTAL POLES',career.poles||0],['CHAMPIONSHIPS',career.championships||0],['SEASONS',career.seasons||0]].map(s=>`<div class="spot-stat"><div class="lbl mono">${s[0]}</div><div class="val">${s[1]}</div></div>`).join('')}</div>
+      <div class="result-pills">${pills||'<span class="mono" style="font-size:11px;color:var(--f1-text-2)">No recent results</span>'}</div></div>
+    <div class="spot-actions" style="align-self:end"><button class="btn-action" id="shareBtn">SHARE MY WALL</button><button class="btn-action" id="remindBtn">RACE REMINDERS</button></div>`;
+  document.getElementById('shareBtn').onclick=()=>drawShareCard(cfg,data,standing,d);
+  document.getElementById('remindBtn').onclick=()=>{if(__deferredPrompt)__deferredPrompt.prompt();else alert('Enable notifications via PWA install first.');};
+}
+
+
+function renderNext3(data){
+  const upcoming=(data.schedule||[]).filter(s=>s.status==='upcoming').slice(0,3);
+  document.getElementById('next3Grid').innerHTML=upcoming.map((s,i)=>`<div class="next3-card ${i===0?'primary':''}">
+    <div class="next3-eyebrow mono">ROUND ${s.round} · ${fmtShort(s.start_utc)}</div>
+    <div class="next3-name f1-display">${esc(s.short_name||s.locality)}</div>
+    <div class="mono">${flagFor(s.country,s.locality)} ${esc(s.country)} · ${esc(s.locality)}</div>
+    <div class="next3-cd" data-countdown data-target="${s.start_utc||''}">—</div></div>`).join('');
+}
+
+function populateTelemetrySelects(cfg){
+  const teams={};DRIVERS_2026.forEach(d=>{(teams[d.team_id]=teams[d.team_id]||[]).push(d);});
+  const mk=sel=>Object.entries(teams).map(([tid,drs])=>`<optgroup label="${drs[0].team_name}">${drs.map(d=>`<option value="${d.code}">${d.code} — ${d.given_name} ${d.family_name}</option>`).join('')}</optgroup>`).join('');
+  const s1=document.getElementById('telDriver1');const s2=document.getElementById('telDriver2');
+  s1.innerHTML=mk();s2.innerHTML=mk();s1.value=cfg?.driverCode||'NOR';s2.value='VER';
+  s1.onchange=()=>fetchTelemetry(s1.value,s2.value,document.getElementById('telCompare').checked);
+  s2.onchange=()=>fetchTelemetry(s1.value,s2.value,true);
+  document.getElementById('telCompare').onchange=e=>{s2.classList.toggle('hidden',!e.target.checked);document.getElementById('telDelta').classList.toggle('hidden',!e.target.checked);
+    fetchTelemetry(s1.value,s2.value,e.target.checked);};
+}
+
+function downsampleTel(tel,step=2){
+  if(!tel||!tel.distance?.length)return tel;
+  const out={...tel};
+  ['distance','speed','throttle','brake','nGear','drs'].forEach(k=>{if(tel[k]?.length)out[k]=tel[k].filter((_,i)=>i%step===0);});
+  if(tel.sectors?.length)out.sectors=tel.sectors.filter((_,i)=>i%step===0);
+  return out;
+}
+
+function showTelemetryState(state,msg){
+  const text=state==='loading'?'Loading telemetry…':(msg||'Telemetry unavailable for this session.');
+  ['telSpeed','telMap','telDelta'].forEach(id=>{
+    const c=document.getElementById(id);if(!c)return;
+    const ctx=c.getContext('2d');const w=c.width=c.clientWidth,h=c.height;
+    ctx.fillStyle='#151515';ctx.fillRect(0,0,w,h);
+    if(state!=='ready'){ctx.fillStyle='#888';ctx.font='12px F1 Regular,sans-serif';ctx.textAlign='center';
+      ctx.fillText(text,w/2,h/2);ctx.textAlign='left';}
+  });
+  const meta=document.getElementById('telMeta');
+  if(meta)meta.textContent=state==='ready'?'':text;
+}
+
+async function fetchTelemetry(code1,code2,compare){
+  if(__telFetching)return;
+  code1=code1||document.getElementById('telDriver1')?.value||'NOR';
+  compare=compare??document.getElementById('telCompare')?.checked;
+  const reqId=++__telReqId;
+  __telFetching=true;
+  showTelemetryState('loading');
+  try{
+    const t1=await apiFetch(`/api/telemetry/${code1}`,{timeout:60000,retries:1});
+    if(reqId!==__telReqId)return;
+    __telemetry1=(t1?._error||t1?.error)?null:downsampleTel(t1);
+    if(compare){
+      code2=code2||document.getElementById('telDriver2')?.value||'VER';
+      try{const t2=await apiFetch(`/api/telemetry/${code2}`,{timeout:60000,retries:1});
+        __telemetry2=(t2?._error||t2?.error)?null:downsampleTel(t2);
+      }catch{__telemetry2=null;}
+    }else __telemetry2=null;
+    if(reqId!==__telReqId)return;
+    if(!__telemetry1?.distance?.length){showTelemetryState('error','Telemetry unavailable — FastF1 session not cached yet.');return;}
+    drawTelemetry(__telemetry1,__telemetry2);
+  }catch{
+    if(reqId===__telReqId)showTelemetryState('error','Could not load telemetry. Try again shortly.');
+  }finally{__telFetching=false;}
+}
+
+function drawTelemetry(t1,t2){
+  showTelemetryState('ready');
+  drawSpeedCanvas(t1,t2);drawMapCanvas(t1,t2);
+  if(t2?.distance?.length){drawDeltaCanvas(t1,t2);}else document.getElementById('telDelta')?.classList.add('hidden');
+  document.getElementById('telMeta').textContent=`${safe(t1.driver_code)} · ${safe(t1.lap_time)} · ${safe(t1.compound,'')}${t2?` vs ${safe(t2.driver_code)}`:''}`;
+}
+
+function drawSpeedCanvas(t1,t2){
+  const c=document.getElementById('telSpeed');const ctx=c.getContext('2d');const w=c.width=c.clientWidth;const h=c.height;
+  ctx.fillStyle='#151515';ctx.fillRect(0,0,w,h);
+  [100,200,300].forEach(v=>{const y=h-20-(v/350)*(h-40);ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.beginPath();ctx.moveTo(40,y);ctx.lineTo(w,y);ctx.stroke();
+    ctx.fillStyle='#888';ctx.font='10px F1 Regular, sans-serif';ctx.fillText(v+'',4,y+4);});
+  const draw=(tel,dashed)=>{if(!tel?.distance?.length)return;const maxD=Math.max(...tel.distance);const maxS=Math.max(...tel.speed,320);
+    ctx.beginPath();tel.distance.forEach((d,i)=>{const x=40+(d/maxD)*(w-50);const y=h-20-(tel.speed[i]/maxS)*(h-40);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.strokeStyle=dashed?'rgba(255,255,255,0.5)':'#fff';ctx.lineWidth=dashed?1.5:2;ctx.setLineDash(dashed?[6,4]:[]);ctx.stroke();ctx.setLineDash([]);
+    if(!dashed){const g=ctx.createLinearGradient(0,0,0,h);g.addColorStop(0,'rgba(255,255,255,0.15)');g.addColorStop(1,'transparent');
+      ctx.lineTo(40+(tel.distance.at(-1)/maxD)*(w-50),h-20);ctx.lineTo(40,h-20);ctx.closePath();ctx.fillStyle=g;ctx.fill();}
+    if(tel.throttle?.length)tel.throttle.forEach((th,i)=>{if(th>0){const x=40+(tel.distance[i]/maxD)*(w-50);ctx.fillStyle='rgba(0,210,190,0.2)';ctx.fillRect(x,h-18,3,14*(th/100));}});
+    if(tel.brake?.length)tel.brake.forEach((br,i)=>{if(br){const x=40+(tel.distance[i]/maxD)*(w-50);ctx.fillStyle='rgba(225,6,0,0.25)';ctx.fillRect(x,h-18,3,14);}});
+    if(tel.drs?.length)tel.drs.forEach((dr,i)=>{if(dr>0){const x=40+(tel.distance[i]/maxD)*(w-50);ctx.fillStyle='#a855f7';ctx.fillRect(x,h-4,3,3);}});
+  };
+  draw(t1,false);draw(t2,true);
+  const maxD=t1?Math.max(...t1.distance):1000;
+  for(let m=0;m<=maxD;m+=500){const x=40+(m/maxD)*(w-50);ctx.fillStyle='#666';ctx.font='9px F1 Regular, sans-serif';ctx.fillText(m+'m',x-10,h-2);}
+}
+
+function drawMapCanvas(t1,t2){
+  const c=document.getElementById('telMap');const ctx=c.getContext('2d');const w=c.width=c.clientWidth;const h=c.height;const pad=20;
+  ctx.fillStyle='#151515';ctx.fillRect(0,0,w,h);
+  const drawPath=(sectors,dashed)=>{if(!sectors?.length)return;
+    ctx.beginPath();sectors.forEach((p,i)=>{const x=pad+p.x*(w-pad*2);const y=pad+(1-p.y)*(h-pad*2);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+    ctx.strokeStyle='#38383f';ctx.lineWidth=4;ctx.stroke();
+    for(let i=1;i<sectors.length;i++){const p=sectors[i],pr=sectors[i-1];ctx.strokeStyle=p.color;ctx.lineWidth=2;ctx.setLineDash(dashed?[4,3]:[]);
+      ctx.beginPath();ctx.moveTo(pad+pr.x*(w-pad*2),pad+(1-pr.y)*(h-pad*2));ctx.lineTo(pad+p.x*(w-pad*2),pad+(1-p.y)*(h-pad*2));ctx.stroke();}
+    ctx.setLineDash([]);
+    if(!dashed&&sectors[0]){const s=sectors[0];ctx.fillStyle='#fff';ctx.beginPath();ctx.moveTo(pad+s.x*(w-pad*2),pad+(1-s.y)*(h-pad*2));
+      ctx.lineTo(pad+s.x*(w-pad*2)+10,pad+(1-s.y)*(h-pad*2)-5);ctx.lineTo(pad+s.x*(w-pad*2)+10,pad+(1-s.y)*(h-pad*2)+5);ctx.fill();}
+  };
+  drawPath(t1?.sectors,false);drawPath(t2?.sectors,true);
+  ['S1','S2','S3'].forEach((l,i)=>{if(t1?.sectors?.[Math.floor(t1.sectors.length*(i/3))]){const p=t1.sectors[Math.floor(t1.sectors.length*(i/3))];
+    ctx.fillStyle='#888';ctx.font='10px F1 Regular, sans-serif';ctx.fillText(l,pad+p.x*(w-pad*2),pad+(1-p.y)*(h-pad*2)-8);}});
+}
+
+function drawDeltaCanvas(t1,t2){
+  const c=document.getElementById('telDelta');c.classList.remove('hidden');const ctx=c.getContext('2d');const w=c.width=c.clientWidth;const h=c.height;
+  ctx.fillStyle='#151515';ctx.fillRect(0,0,w,h);if(!t1?.distance||!t2?.distance)return;
+  const maxD=Math.max(...t1.distance,...t2.distance);const mid=h/2;
+  ctx.strokeStyle='rgba(255,255,255,0.1)';ctx.beginPath();ctx.moveTo(40,mid);ctx.lineTo(w,mid);ctx.stroke();
+  for(let i=0;i<t1.distance.length;i++){const d=t1.distance[i];const s1=t1.speed[i];
+    let s2=t2.speed[Math.min(Math.round(i*t2.speed.length/t1.speed.length),t2.speed.length-1)]||0;
+    const delta=s1-s2;const x=40+(d/maxD)*(w-50);const y=mid-delta*0.4;
+    ctx.strokeStyle=delta>=0?'#4ad07c':'#e10600';ctx.beginPath();ctx.moveTo(x,mid);ctx.lineTo(x,y);ctx.stroke();}
+  ctx.fillStyle='#888';ctx.font='10px F1 Regular, sans-serif';ctx.fillText('SPEED DELTA',4,12);
+}
+
+function renderHistoryChart(hist,cfg){
+  const data=hist?.history||[];
+  const c=document.getElementById('historyChart');
+  if(!c)return;
+  if(!data.length){showError(c.parentElement,'No championship history yet');return;}
+  if(__historyAnimId){cancelAnimationFrame(__historyAnimId);__historyAnimId=null;}
+  const ctx=c.getContext('2d');
+  const drawStatic=()=>{
+    const w=c.width=c.clientWidth,h=c.height;
+    ctx.fillStyle='#151515';ctx.fillRect(0,0,w,h);
+    const allPts=data.flatMap(r=>r.drivers.map(d=>d.points));
+    const maxPts=Math.max(...allPts,100)||100;
+    const topCodes={};data[data.length-1]?.drivers?.slice(0,5).forEach(d=>{topCodes[d.code]=d;});
+    const colors={};Object.keys(topCodes).forEach(code=>{colors[code]=getTeamColor(topCodes[code].team_id);});
+    for(let p=0;p<=maxPts;p+=50){const y=h-30-(p/maxPts)*(h-50);ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.beginPath();ctx.moveTo(40,y);ctx.lineTo(w,y);ctx.stroke();}
+    data.forEach((r,i)=>{const x=40+(i/(data.length-1||1))*(w-60);ctx.fillStyle='#666';ctx.save();ctx.translate(x,h-8);ctx.rotate(-0.7);
+      ctx.font='8px F1 Regular,sans-serif';ctx.fillText('R'+safe(r.round),0,0);ctx.restore();});
+    let progress=0;const codes=Object.keys(topCodes);
+    const frame=()=>{
+      progress=Math.min(progress+0.03,1);
+      ctx.fillStyle='#151515';ctx.fillRect(0,0,w,h);
+      for(let p=0;p<=maxPts;p+=50){const y=h-30-(p/maxPts)*(h-50);ctx.strokeStyle='rgba(255,255,255,0.06)';ctx.beginPath();ctx.moveTo(40,y);ctx.lineTo(w,y);ctx.stroke();}
+      codes.forEach(code=>{
+        const pts=data.map(r=>(r.drivers.find(d=>d.code===code)||{points:0}).points);
+        const col=colors[code];ctx.strokeStyle=col;ctx.lineWidth=2;ctx.beginPath();
+        const lim=Math.max(1,Math.floor(pts.length*progress));
+        pts.slice(0,lim).forEach((p,i)=>{const x=40+(i/(data.length-1||1))*(w-60);const y=h-30-(p/maxPts)*(h-50);i?ctx.lineTo(x,y):ctx.moveTo(x,y);});
+        ctx.stroke();
+        if(lim>0){const lx=40+((lim-1)/(data.length-1||1))*(w-60);const ly=h-30-(pts[lim-1]/maxPts)*(h-50);
+          ctx.fillStyle=col;ctx.font='9px F1 Regular,sans-serif';ctx.fillText(code,lx+4,ly);}
+      });
+      if(progress<1)__historyAnimId=requestAnimationFrame(frame);else __historyAnimId=null;
+    };
+    frame();
+  };
+  if(__historyDrawn){drawStatic();return;}
+  const obs=new IntersectionObserver(entries=>{
+    if(entries[0].isIntersecting){drawStatic();__historyDrawn=true;obs.disconnect();}
+  },{threshold:0.15});
+  obs.observe(c);
+}
+
+async function fetchLive(){
+  try{
+    const t0=performance.now();
+    __liveData=await apiFetch('/api/live');
+    __apiLatency=Math.round(performance.now()-t0);
+    updateTopbarLive(__liveData,__latestData);
+    renderLiveTimingTable(__liveData,__latestData,loadConfig());
+    renderTrackMap(__latestData,__liveData,loadConfig());
+    renderGapChart(__latestData,__liveData);
+    renderRaceControl(__latestData,__liveData);
+    renderFooterTicker(__latestData,__liveData);
+  }catch{updateTopbarLive({live:false},__latestData);}
+}
+
+function drawShareCard(cfg,data,standing,d){
+  const cv=document.getElementById('shareCanvas');const ctx=cv.getContext('2d');const tc=getTeamColor(d.team_id);
+  ctx.fillStyle='#151515';ctx.fillRect(0,0,1080,1080);
+  const g1=ctx.createRadialGradient(200,200,0,400,400,500);g1.addColorStop(0,tc+'55');g1.addColorStop(1,'transparent');ctx.fillStyle=g1;ctx.fillRect(0,0,1080,1080);
+  const g2=ctx.createRadialGradient(900,900,0,700,700,400);g2.addColorStop(0,'rgba(212,160,23,0.3)');g2.addColorStop(1,'transparent');ctx.fillStyle=g2;ctx.fillRect(0,0,1080,1080);
+  for(let i=-1080;i<2160;i+=40){ctx.fillStyle='rgba(255,255,255,0.03)';ctx.fillRect(i,0,20,1080);}
+  ctx.font='italic 280px F1 Torque, sans-serif';ctx.fillStyle=tc+'26';ctx.fillText(String(d.number),80,520);
+  ctx.fillStyle='#e10600';ctx.fillRect(0,1066,1080,14);
+  ctx.strokeStyle='#38383f';ctx.strokeRect(30,30,60,60);ctx.strokeRect(990,990,60,60);
+  ctx.fillStyle='#888';ctx.font='20px F1 Regular, sans-serif';ctx.textAlign='center';ctx.fillText('F1 2026 · THE PIT WALL',540,120);
+  ctx.fillStyle=tc;ctx.font='italic 48px F1 Torque, sans-serif';ctx.fillText('Hello, '+(cfg?.name||'Fan')+'.',540,200);
+  ctx.fillStyle='#fff';ctx.font='72px F1 Turbo, sans-serif';ctx.fillText(d.given_name+' '+d.family_name,540,300);
+  ctx.font='24px F1 Regular, sans-serif';ctx.fillStyle=tc;ctx.fillText(d.code+' · '+d.team_name,540,360);
+  ctx.fillStyle='#fff';ctx.font='56px F1 Regular, sans-serif';ctx.fillText(`P${standing?.pos||'—'} · ${standing?.pts||0} PTS`,540,450);
+  const nr=data.next_race;ctx.font='20px F1 Regular, sans-serif';ctx.fillStyle='#888';ctx.fillText('NEXT · '+(nr?.short_name||'')+' · '+fmtShort(nr?.start_utc),540,520);
+  ctx.fillText('f1.anirudhgoel.xyz · built by @anirudh.nocode',540,980);ctx.textAlign='left';
+  cv.toBlob(async blob=>{const file=new File([blob],'pitwall.png',{type:'image/png'});
+    if(navigator.share&&navigator.canShare?.({files:[file]})){try{await navigator.share({files:[file],title:'My F1 Pit Wall'});return;}catch{}}
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='f1-pitwall.png';a.click();});
+}
+
+/* Thanks popup */
+const DWELL_KEY='f1-dwell';const THANKS_KEY='f1-thanks-dismiss';const TIPPED_KEY='f1-tipped';
+function trackDwell(){
+  if(localStorage.getItem(TIPPED_KEY))return;
+  const dismissed=localStorage.getItem(THANKS_KEY);if(dismissed&&Date.now()-+dismissed<7*864e5)return;
+  let total=+(localStorage.getItem(DWELL_KEY)||0);
+  setInterval(()=>{total+=5;localStorage.setItem(DWELL_KEY,String(total));
+    if(total>=90&&!document.getElementById('thanksPopup').classList.contains('show'))showThanks();},5000);
+}
+function showThanks(){const cfg=loadConfig();document.getElementById('thanksTitle').textContent=`Hey ${cfg?.name||'there'}, enjoying your wall?`;
+  document.getElementById('thanksPopup').classList.add('show');
+  const locale=(navigator.language||'').toLowerCase();
+  document.getElementById('thanksTip').textContent=locale.includes('in')?'Tip via UPI':'Tip via Ko-fi';
+}
+document.getElementById('thanksSkip').onclick=()=>{localStorage.setItem(THANKS_KEY,String(Date.now()));document.getElementById('thanksPopup').classList.remove('show');};
+document.getElementById('thanksTip').onclick=()=>{localStorage.setItem(TIPPED_KEY,'1');const locale=(navigator.language||'').toLowerCase();window.open(locale.includes('in')?'https://upi.link':'https://ko-fi.com','_blank');};
+
+/* PWA */
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();__deferredPrompt=e;document.getElementById('installChip').classList.add('show');});
+document.getElementById('installChip').onclick=()=>{if(__deferredPrompt){__deferredPrompt.prompt();__deferredPrompt=null;}};
+if(/iPhone|iPad|iPod/.test(navigator.userAgent)&&!navigator.standalone)setTimeout(()=>{document.getElementById('installTooltip').style.display='block';},14000);
+if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+function openEditProfile(){
+  const cfg=loadConfig();
+  document.getElementById('onboarding').style.display='flex';
+  document.getElementById('obStep1').classList.add('active');
+  document.getElementById('obStep2').classList.remove('active');
+  initOnboarding(cfg);
+}
+
+document.getElementById('settingsEditProfile')?.addEventListener('click',openEditProfile);
+document.getElementById('settingsInstall')?.addEventListener('click',()=>document.getElementById('installChip').click());
+
+function initNav(){
+  const panelIds=['panelDrivers','panelTeams','panelCalendar','panelStatistics','panelTelemetry','panelPaddock','panelQuali','panelSpotlight','panelSettings'];
+  document.querySelectorAll('.nav-item').forEach(item=>{
+    item.addEventListener('click',e=>{
+      e.preventDefault();
+      document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+      item.classList.add('active');
+      const target=item.dataset.target;
+      if(panelIds.includes(target)){
+        panelIds.forEach(id=>{const p=document.getElementById(id);if(p)p.classList.add('hidden');});
+        const panel=document.getElementById(target);
+        if(panel){panel.classList.remove('hidden');panel.scrollIntoView({behavior:'smooth',block:'start'});}
+      }else{
+        panelIds.forEach(id=>document.getElementById(id)?.classList.add('hidden'));
+        const el=document.getElementById(target);
+        const scrollEl=el?.closest('.widget')||el;
+        if(scrollEl)scrollEl.scrollIntoView({behavior:'smooth',block:'start'});
+      }
+      document.getElementById('sidebar')?.classList.remove('open');
+      document.getElementById('sidebarOverlay')?.classList.remove('show');
+    });
+  });
+  document.getElementById('menuBtn')?.addEventListener('click',()=>{
+    document.getElementById('sidebar')?.classList.toggle('open');
+    document.getElementById('sidebarOverlay')?.classList.toggle('show');
+  });
+  document.getElementById('sidebarOverlay')?.addEventListener('click',()=>{
+    document.getElementById('sidebar')?.classList.remove('open');
+    document.getElementById('sidebarOverlay')?.classList.remove('show');
+  });
+  document.querySelectorAll('.standings-tab').forEach(tab=>{
+    tab.addEventListener('click',()=>{
+      document.querySelectorAll('.standings-tab').forEach(t=>t.classList.remove('active'));
+      tab.classList.add('active');
+      __standingsTab=tab.dataset.tab;
+      renderStandingsWidget(__latestData,loadConfig());
+    });
+  });
+  document.getElementById('searchBtn')?.addEventListener('click',()=>{
+    const q=prompt('Search driver code (e.g. NOR):');
+    if(q){const d=DRIVERS_2026.find(x=>x.code===q.toUpperCase());if(d)alert(`${d.given_name} ${d.family_name} · ${d.team_name}`);else alert('Driver not found');}
+  });
+}
+
+function startDashboard(cfg){fetchAndRender(cfg,false);__pollTimer=setInterval(()=>fetchAndRender(loadConfig(),true),POLL_MS);
+  __liveTimer=setInterval(fetchLive,LIVE_POLL_MS);fetchLive();trackDwell();initNav();}
+
+(function boot(){
+  const cfg=loadConfig();
+  saveConfig(cfg);
+  document.getElementById('onboarding').style.display='none';
+  document.getElementById('dashboard').classList.add('visible');
+  hideSplash();
+  initSkeletons();
+  paintHeader(cfg,{});
+  applyTheme(cfg);
+  startDashboard(cfg);
+})();
+
+</script>
+</body>
+</html>

@@ -1,0 +1,11 @@
+.venv
+venv
+f1_cache
+__pycache__
+*.pyc
+.env
+.git
+.gitignore
+.DS_Store
+ARCHITECTURE.md
+README.md
