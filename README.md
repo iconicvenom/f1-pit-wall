@@ -27,7 +27,7 @@ No account required. No npm install. No React build step. Run with Docker (`dock
 - [Features](#features)
 - [Screenshots & UI Overview](#screenshots--ui-overview)
   - [Demo Video](#demo-video)
-- [Architecture](#architecture)
+- [System Architecture](#system-architecture)
 - [Technology Stack](#technology-stack)
 - [Data Sources](#data-sources)
 - [Quick Start](#quick-start)
@@ -185,9 +185,11 @@ Fonts are loaded from the local `fonts/` directory and preloaded in `<head>` for
 
 ---
 
-## Architecture
+## System Architecture
 
-F1 Pit Wall uses a **decoupled two-tier architecture** with no database:
+F1 Pit Wall uses a **decoupled two-tier architecture** with no database, no WebSockets, and no server-side user accounts. The browser owns presentation and personalization; the FastAPI server owns data aggregation, caching, and fallback logic.
+
+### High-Level Overview
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -210,7 +212,143 @@ F1 Pit Wall uses a **decoupled two-tier architecture** with no database:
   └─────────┘
 ```
 
-**Design decisions:**
+### Component Diagram
+
+```mermaid
+flowchart TB
+    subgraph Client["Browser Client"]
+        HTML["index.html<br/>SPA + Canvas renderers"]
+        SW["sw.js<br/>Service Worker"]
+        LS["localStorage<br/>User preferences"]
+    end
+    subgraph API["FastAPI Server :8000"]
+        ROUTES["12 REST endpoints"]
+        MCACHE["In-memory cache<br/>TTL 600s / 15s / 1800s"]
+        WARM["Startup warmup thread"]
+    end
+    subgraph Disk["Local Disk"]
+        FC["./f1_cache<br/>FastF1 session cache"]
+    end
+    subgraph External["External Data Sources"]
+        FF1["FastF1 — laps, stints, telemetry, weather"]
+        JOL["Jolpica / Ergast — standings, history"]
+        OF1["OpenF1 — live timing, positions"]
+        SM["Sportmonks CDN — track layouts"]
+    end
+    HTML -->|fetch /api/*| ROUTES
+    SW -->|cache shell, fonts, assets| HTML
+    HTML --> LS
+    ROUTES --> MCACHE
+    ROUTES --> FF1
+    ROUTES --> JOL
+    ROUTES --> OF1
+    ROUTES --> SM
+    FF1 --> FC
+    WARM --> FF1
+```
+
+### Architectural Tiers
+
+| Tier | Components | Responsibility |
+|------|------------|----------------|
+| **Presentation** | `index.html`, `sw.js`, `manifest.webmanifest` | UI rendering, onboarding, Canvas charts, 15s/10min polling, PWA offline shell |
+| **API** | `server.py` (FastAPI + Uvicorn) | REST aggregation, `@cached` TTL store, triple-fallback chains, HTTP 206 partial responses |
+| **Persistence** | `localStorage`, `./f1_cache/` | User profile (client-side); FastF1 session files (server-side disk) |
+| **External** | FastF1, Jolpica, OpenF1, Sportmonks | Authoritative F1 data — no PostgreSQL or Redis |
+
+### Request Lifecycle
+
+Every API call follows the same pipeline:
+
+1. **CORS** — `CORSMiddleware` handles cross-origin preflight
+2. **Route match** — FastAPI path router (`/api/standings`, `/api/live`, etc.)
+3. **Cache lookup** — `@cached` decorator checks in-memory `_cache[key]` against TTL
+4. **Data acquisition** — FastF1 session load, Jolpica HTTP GET, or OpenF1 HTTP GET
+5. **Transform** — pandas DataFrame ops, formatting, team/driver normalization
+6. **Fallback** — If primary source fails, cascade to secondary/tertiary (see below)
+7. **Respond** — JSON `200` (full) or `206` (partial with `"fallback": true`)
+
+```mermaid
+sequenceDiagram
+    participant U as Browser
+    participant API as FastAPI
+    participant MEM as Memory Cache
+    participant FF as FastF1
+    participant JO as Jolpica
+    U->>API: GET /api/standings
+    API->>MEM: Check cache key
+    alt Cache hit
+        MEM-->>API: Cached JSON
+    else Cache miss
+        API->>JO: driverStandings.json
+        API->>FF: load_session(R)
+        FF-->>API: Session data
+        API->>MEM: Store TTL 600s
+    end
+    API-->>U: JSON bundle
+    U->>U: renderAll()
+```
+
+### Data Source Fallback Chains
+
+The backend never returns a blank dashboard. Each data category has an ordered fallback:
+
+| Data Category | Primary | Secondary | Tertiary |
+|---------------|---------|-----------|----------|
+| **Standings** | Jolpica / Ergast | OpenF1 computed | FastF1 aggregated |
+| **Schedule** | Jolpica | OpenF1 meetings | FastF1 schedule |
+| **Race results** | FastF1 session | OpenF1 session_result | — |
+| **Qualifying** | OpenF1 session_result | FastF1 Q session | — |
+| **Live timing** | OpenF1 position/car_data | — | `live: false` |
+| **Weather** | OpenF1 weather | FastF1 session weather | HTTP 206 |
+| **Track images** | Sportmonks API | Sportmonks CDN | SVG fallback |
+| **Championship history** | Jolpica per-round | OpenF1 cumulative | FastF1 aggregated |
+
+### Live Session Flow
+
+During an active F1 session, the frontend polls `/api/live` every **15 seconds** (matching the server cache TTL):
+
+```mermaid
+sequenceDiagram
+    participant UI as index.html
+    participant API as /api/live
+    participant OF as OpenF1
+    loop Every 15 seconds
+        UI->>API: GET /api/live
+        API->>OF: GET /sessions?year=2026
+        alt Session active
+            API->>OF: GET /position, /car_data, /race_control
+            OF-->>API: Live grid + flags
+            API-->>UI: live:true + grid
+            UI->>UI: Show live banner + timing grid
+        else Between sessions
+            API-->>UI: live:false
+        end
+    end
+```
+
+### Frontend Polling Architecture
+
+| Timer | Interval | Endpoint(s) | Purpose |
+|-------|----------|-------------|---------|
+| General refresh | 10 min | `/api/standings`, `/api/weather`, `/api/qualifying`, … | Standings, widgets, panels |
+| Live timing | 15 sec | `/api/live` | Position grid during active sessions |
+| Countdown | 1 sec | — | Lights-out countdown in topbar |
+| Dwell tracker | 5 sec | — | Thanks popup gate (90s cumulative) |
+
+### Docker Deployment Topology
+
+In production, a **single container** serves both tiers on port 8000 — Uvicorn handles `/api/*` routes and static assets (`index.html`, `fonts/`, `assets/`, `sw.js`). The `f1_cache` volume persists FastF1 data across restarts.
+
+```mermaid
+flowchart LR
+    USER["Browser"] -->|HTTPS :8000| DOCKER["Docker Container<br/>uvicorn server:app"]
+    DOCKER --> API["/api/* → FastAPI handlers"]
+    DOCKER --> STATIC["/ → StaticFiles<br/>index.html, fonts, assets"]
+    DOCKER --> VOL["f1_cache volume<br/>persistent disk"]
+```
+
+### Design Decisions
 
 | Choice | Rationale |
 |--------|-----------|
@@ -221,8 +359,9 @@ F1 Pit Wall uses a **decoupled two-tier architecture** with no database:
 | **HTTP polling** (not WebSockets) | Simpler ops; 15-second live refresh is sufficient for a fan dashboard |
 | **No PostgreSQL / Redis** | All F1 data is authoritative from external APIs; in-memory Python `dict` cache suffices at demo scale |
 | **PWA service worker** | Offline shell caching without a native app |
+| **No authentication** | Fan dashboard — identity is self-declared name + driver in `localStorage` |
 
-For the full system design document, see [ARCHITECTURE.md](ARCHITECTURE.md).
+For the full system design document (security model, scalability plan, API schemas, developer onboarding), see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ---
 
